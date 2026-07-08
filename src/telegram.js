@@ -141,10 +141,7 @@ async function handleTarget(env, msg, from, text) {
 
   // 已验证 → 转发到 owner
   const ownerChatId = await getConfig(env, 'owner_chat_id') || await getConfig(env, 'owner_id');
-  const header =
-    `👤 <b>${escapeHtml(user.tg_first_name || '匿名')}</b>` +
-    `${user.tg_username ? ` @${escapeHtml(user.tg_username)}` : ''} ` +
-    `<code>id:${uid}</code>\n\n`;
+  const header = userMention(user, uid) + '\n\n';
 
   await relayToOwner(env, ownerChatId, chatId, msg, header);
 }
@@ -295,8 +292,7 @@ function buildSummary(env, session, fp) {
     `✅ <b>新用户验证完成</b>`,
     ``,
     `<b>👤 用户</b>`,
-    `${escapeHtml(session.tg_first_name || '匿名')}${session.tg_username ? ` · @${escapeHtml(session.tg_username)}` : ''}`,
-    `TG ID: <code>${session.tg_user_id || '?'}</code>`,
+    userMention({ tg_first_name: session.tg_first_name, tg_username: session.tg_username }, session.tg_user_id),
     ``,
     `<b>🖥️ 设备</b>`,
     `系统: ${osLine}`,
@@ -333,6 +329,19 @@ function buildSummary(env, session, fp) {
     ``,
     `<i>此人后续消息将自动转发到本对话,直接回复即可对话。</i>`,
   ].filter((x) => x !== null).join('\n');
+}
+
+/**
+ * 生成可点击的用户标识 —— 点名字 = 打开资料页
+ * TG 官方文档支持 <a href="tg://user?id=X">Name</a> 作为 text_mention
+ */
+function userMention(user, uid) {
+  const name = escapeHtml(user.tg_first_name || user.tg_username || `用户 ${uid}`);
+  const link = `<a href="tg://user?id=${uid}">${name}</a>`;
+  const uname = user.tg_username
+    ? ` · <a href="https://t.me/${escapeHtml(user.tg_username)}">@${escapeHtml(user.tg_username)}</a>`
+    : '';
+  return `👤 <b>${link}</b>${uname} <code>${uid}</code>`;
 }
 
 function shortGPU(g) {
