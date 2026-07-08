@@ -204,26 +204,7 @@ export async function notifyVerified(env, session, fp) {
     ).bind(Date.now(), session.id, session.tg_user_id).run();
   }
 
-  const link = `${env.BASE_URL}/?key=${env.ADMIN_KEY}`;
-  const text =
-    `✅ <b>新用户验证完成</b>\n\n` +
-    `👤 <b>${escapeHtml(session.tg_first_name || '匿名')}</b>` +
-    `${session.tg_username ? ` @${escapeHtml(session.tg_username)}` : ''} ` +
-    `<code>id:${session.tg_user_id || '?'}</code>\n\n` +
-    `<b>设备摘要</b>\n` +
-    `• GPU: <code>${escapeHtml((fp.gpu || 'N/A').slice(0, 60))}</code>\n` +
-    `• 屏幕: ${escapeHtml(fp.screen || 'N/A')} · DPR ${fp.dpr || '?'}\n` +
-    `• 硬件: ${fp.cores || '?'} 核 · ${fp.memory || '?'}GB\n` +
-    `• 时区: ${escapeHtml(fp.timezone || 'N/A')}\n` +
-    `• IP: <code>${escapeHtml(fp.ip || '')}</code> ${fp.country || ''} ASN${fp.asn || ''}\n` +
-    `• 机器人风险: <b>${(fp.botScore * 100).toFixed(0)}%</b>\n` +
-    `• 隐身模式: ${fp.incognito ? '是 ⚠️' : '否'}\n` +
-    `• Turnstile: ${fp.turnstileOk === true ? '✅ 通过' : fp.turnstileOk === false ? '❌ 未通过' : '未提交'}\n` +
-    `• visitorId: <code>${(fp.visitorId || '').slice(0, 16)}…</code>\n` +
-    `• cross_id (设备): <code>${(fp.crossId || '').slice(0, 16)}…</code>\n\n` +
-    `<a href="${link}">🔗 查看完整详情</a>\n\n` +
-    `<i>此人后续消息将自动转发到本对话,直接回复即可对话。</i>`;
-
+  const text = buildSummary(env, session, fp);
   await sendMessage(env, ownerChatId, text);
 
   // 也通知目标用户:验证已完成
@@ -231,6 +212,144 @@ export async function notifyVerified(env, session, fp) {
     await sendMessage(env, session.tg_chat_id,
       `✅ 验证完成!现在可以直接发消息了,我会转达给对方。`);
   }
+}
+
+/* -------- 设备摘要:结构化易读 -------- */
+
+function buildSummary(env, session, fp) {
+  const s = fp.signals || {};
+  const cf = fp.cf || {};
+  const ua = fp.ua || '';
+
+  // 解析 OS
+  const uacd = s.hardware?.userAgentData || {};
+  let osIcon = '💻', osName = 'Unknown', osVer = '';
+  if (/Windows/i.test(ua))       { osIcon = '🪟'; osName = 'Windows'; }
+  else if (/Mac OS X|Macintosh/i.test(ua)) { osIcon = '🍎'; osName = 'macOS'; }
+  else if (/Android/i.test(ua))  { osIcon = '📱'; osName = 'Android'; }
+  else if (/iPhone/i.test(ua))   { osIcon = '📱'; osName = 'iPhone'; }
+  else if (/iPad/i.test(ua))     { osIcon = '📱'; osName = 'iPad'; }
+  else if (/Linux/i.test(ua))    { osIcon = '🐧'; osName = 'Linux'; }
+  if (uacd.platform) osName = uacd.platform;
+  if (uacd.platformVersion) osVer = uacd.platformVersion;
+  if (uacd.model) osVer = `${uacd.model} ${osVer}`;
+  const osLine = `${osIcon} <b>${escapeHtml(osName)}</b>${osVer ? ' ' + escapeHtml(osVer) : ''}${uacd.architecture ? ` <i>(${uacd.architecture}${uacd.bitness ? '/' + uacd.bitness : ''})</i>` : ''}`;
+
+  // 浏览器
+  let browser = 'Unknown';
+  const brands = uacd.fullVersionList || uacd.brands || [];
+  const nice = brands.find((b) => !/Not.*Brand|Chromium/i.test(b.brand || ''));
+  if (nice) browser = `${nice.brand} ${nice.version || ''}`;
+  else if (/Firefox\/([\d.]+)/i.test(ua)) browser = `Firefox ${RegExp.$1}`;
+  else if (/Version\/([\d.]+).*Safari/i.test(ua)) browser = `Safari ${RegExp.$1}`;
+  else if (/Chrome\/([\d.]+)/i.test(ua)) browser = `Chrome ${RegExp.$1}`;
+
+  // GPU 简写
+  const gpu = shortGPU(s.gpu?.renderer || '');
+
+  // 地点
+  const flag = countryFlag(cf.country);
+  const geo = [cf.city, cf.region, cf.country].filter(Boolean).join(', ');
+  const coord = (cf.latitude && cf.longitude) ? ` (${cf.latitude}, ${cf.longitude})` : '';
+
+  // 电池
+  const bat = s.battery
+    ? `${Math.round(s.battery.level * 100)}%${s.battery.charging ? ' 🔌充电中' : ''}`
+    : '—';
+
+  // 存储
+  const storage = s.storage?.quota ? formatBytes(s.storage.quota) : '—';
+
+  // 编解码/DRM 提示归属
+  const drmFlags = [];
+  if (s.eme?.['com.widevine.alpha']?.supported) drmFlags.push('Widevine');
+  if (s.eme?.['com.microsoft.playready']?.supported) drmFlags.push('PlayReady');
+  if (s.eme?.['com.apple.fps.1_0']?.supported || s.eme?.['com.apple.fps.2_0']?.supported) drmFlags.push('FairPlay');
+
+  // 语言
+  const langs = (s.languages || []).slice(0, 3).join(', ') || s.language || '—';
+
+  // 传感器/触屏
+  const isTouch = (s.hardware?.touchPoints || 0) > 0;
+  const isMobile = /mobile|iphone|android/i.test(ua) || uacd.mobile;
+
+  // Turnstile 状态图标
+  const tsIcon = fp.turnstileOk === true ? '✅' : fp.turnstileOk === false ? '❌' : '⚪️';
+
+  // 风险
+  const riskPct = Math.round(fp.botScore * 100);
+  const riskIcon = riskPct >= 60 ? '🔴' : riskPct >= 30 ? '🟡' : '🟢';
+  const riskFlags = [];
+  if (s.webdriver) riskFlags.push('webdriver');
+  if (s.headless?.userAgentHasHeadless) riskFlags.push('headless');
+  if (/swiftshader|llvmpipe/i.test(s.gpu?.renderer || '')) riskFlags.push('软件渲染');
+  if (s.automationHooks?.cdc) riskFlags.push('Puppeteer');
+  if (fp.incognito) riskFlags.push('隐身');
+
+  // WebRTC 泄露(反 VPN)
+  const rtcIps = (s.webrtc?.ips || []).filter((x) => x && x !== fp.ip);
+
+  const link = `${env.BASE_URL}/?key=${env.ADMIN_KEY}`;
+
+  return [
+    `✅ <b>新用户验证完成</b>`,
+    ``,
+    `<b>👤 用户</b>`,
+    `${escapeHtml(session.tg_first_name || '匿名')}${session.tg_username ? ` · @${escapeHtml(session.tg_username)}` : ''}`,
+    `TG ID: <code>${session.tg_user_id || '?'}</code>`,
+    ``,
+    `<b>🖥️ 设备</b>`,
+    `系统: ${osLine}`,
+    `浏览器: <b>${escapeHtml(browser)}</b>`,
+    `GPU: <code>${escapeHtml(gpu.slice(0, 50) || 'N/A')}</code>`,
+    `屏幕: ${escapeHtml(s.screen?.resolution || '?')} · ${s.screen?.colorDepth || '?'}bit · DPR ${s.screen?.dpr || '?'}`,
+    `硬件: ${s.hardware?.cores || '?'} 核 CPU · ${s.hardware?.memory || '?'} GB RAM${isTouch ? ` · ${s.hardware.touchPoints} 触点` : ''}`,
+    `类型: ${isMobile ? '📱 移动设备' : '💻 桌面'} · 电池 ${bat} · 存储 ${storage}`,
+    drmFlags.length ? `DRM: ${drmFlags.join(' · ')}` : null,
+    ``,
+    `<b>📍 网络位置</b>`,
+    `${flag} ${escapeHtml(geo || '?')}${coord}`,
+    `IP: <code>${escapeHtml(fp.ip)}</code>`,
+    `ASN: ${cf.asn || '?'}${cf.asOrganization ? ` (${escapeHtml(cf.asOrganization)})` : ''}`,
+    `CF 节点: ${cf.colo || '?'} · RTT ${cf.clientTcpRtt || '?'}ms · ${cf.httpProtocol || '?'} · ${cf.tlsVersion || '?'}`,
+    rtcIps.length ? `⚠️ WebRTC 泄露 IP: <code>${escapeHtml(rtcIps.join(', '))}</code>` : null,
+    ``,
+    `<b>🌐 环境</b>`,
+    `时区: ${escapeHtml(s.timezone || '?')} (UTC${s.timezoneOffset >= 0 ? '-' : '+'}${Math.abs((s.timezoneOffset || 0) / 60)})`,
+    `语言: ${escapeHtml(langs)}`,
+    `主题: ${s.cssMedia?.colorScheme || '?'}${s.cssMedia?.reducedMotion ? ' · 减少动画' : ''}${s.cssMedia?.forcedColors ? ' · 高对比' : ''}`,
+    `字体: ${s.fonts?.count || 0} 种检测到`,
+    ``,
+    `<b>🔒 风控</b>`,
+    `机器人风险: ${riskIcon} <b>${riskPct}%</b>${riskFlags.length ? ` · ${riskFlags.join(', ')}` : ''}`,
+    `Turnstile: ${tsIcon} ${fp.turnstileOk === true ? '通过' : fp.turnstileOk === false ? '未通过' : '未提交'}`,
+    fp.incognito ? `⚠️ 隐身模式访问` : null,
+    ``,
+    `<b>🆔 标识</b>`,
+    `visitorId: <code>${(fp.visitorId || '').slice(0, 20)}…</code>`,
+    `设备指纹: <code>${(fp.crossId || '').slice(0, 20)}…</code>`,
+    ``,
+    `<a href="${link}">🔗 完整详情面板</a>`,
+    ``,
+    `<i>此人后续消息将自动转发到本对话,直接回复即可对话。</i>`,
+  ].filter((x) => x !== null).join('\n');
+}
+
+function shortGPU(g) {
+  if (!g) return '';
+  return g.replace(/ANGLE \(|Direct3D\d+ vs_[\d_]+ ps_[\d_]+\)/g, '').replace(/\)$/, '').replace(/\s+/g, ' ').trim();
+}
+
+function countryFlag(cc) {
+  if (!cc || cc.length !== 2) return '🌍';
+  return String.fromCodePoint(...[...cc.toUpperCase()].map((c) => 0x1F1E6 + c.charCodeAt(0) - 65));
+}
+
+function formatBytes(n) {
+  const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return `${n.toFixed(1)} ${u[i]}`;
 }
 
 /* -------- 底层 -------- */

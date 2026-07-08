@@ -118,16 +118,10 @@ export async function handleCollect(request, env) {
   if (session.tg_user_id) {
     try {
       await notifyVerified(env, session, {
-        visitorId, crossId, botScore,
-        gpu: signals.gpu?.renderer,
-        screen: signals.screen?.resolution,
-        dpr: signals.screen?.dpr,
-        cores: signals.hardware?.cores,
-        memory: signals.hardware?.memory,
-        timezone: signals.timezone,
-        ip, country: cf.country, asn: cf.asn,
+        visitorId, crossId, botScore, ip, ua,
         incognito: !!incognito,
         turnstileOk: turnstileResult.present ? turnstileResult.success : null,
+        cf, signals,
       });
     } catch (e) { /* 不阻塞返回 */ }
   }
