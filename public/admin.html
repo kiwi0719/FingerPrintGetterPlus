@@ -6,7 +6,7 @@
 <title>指纹数据管理</title>
 <style>
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  body { font-family: -apple-system, "Segoe UI", "PingFang SC", Roboto, sans-serif;
          margin: 0; padding: 20px; background: #0f172a; color: #e2e8f0; }
   .top { display: flex; gap: 10px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
   input, button { padding: 8px 12px; border-radius: 6px; border: 1px solid #334155;
@@ -19,16 +19,88 @@
   .stat .n { font-size: 24px; font-weight: bold; color: #38bdf8; }
   .stat .k { font-size: 12px; color: #94a3b8; margin-top: 4px; }
   table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 8px; overflow: hidden; }
-  th, td { padding: 10px; text-align: left; border-bottom: 1px solid #334155; font-size: 13px; }
+  th, td { padding: 10px; text-align: left; border-bottom: 1px solid #334155; font-size: 13px; vertical-align: middle; }
   th { background: #0f172a; color: #94a3b8; font-weight: 600; }
   tr:hover { background: #263449; }
   code { background: #0f172a; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
   .risk-high { color: #ef4444; }
   .risk-mid { color: #f59e0b; }
   .risk-low { color: #4ade80; }
-  details { margin-top: 8px; }
-  details pre { background: #0f172a; padding: 12px; border-radius: 6px; overflow: auto;
-                max-height: 400px; font-size: 12px; }
+  .link-btn { background: transparent; border: 1px solid #38bdf8; color: #38bdf8;
+              padding: 4px 10px; font-size: 12px; border-radius: 4px; cursor: pointer; }
+  .link-btn:hover { background: #38bdf8; color: #0f172a; }
+
+  /* ---------- Modal ---------- */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 100;
+              display: none; align-items: flex-start; justify-content: center; padding: 30px;
+              overflow-y: auto; }
+  .modal-bg.open { display: flex; }
+  .modal { background: #0f172a; border: 1px solid #334155; border-radius: 12px;
+           max-width: 1080px; width: 100%; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+  .modal-head { display: flex; justify-content: space-between; align-items: center;
+                margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #334155; }
+  .modal-head h2 { margin: 0; font-size: 18px; }
+  .close-btn { background: transparent; border: none; color: #94a3b8; font-size: 24px;
+               cursor: pointer; padding: 0; width: 32px; height: 32px; }
+
+  /* Summary hero */
+  .hero { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 12px; margin-bottom: 20px; }
+  .hero-card { background: #1e293b; border-radius: 8px; padding: 14px; border: 1px solid #334155; }
+  .hero-card .lbl { font-size: 11px; color: #94a3b8; text-transform: uppercase;
+                    letter-spacing: .05em; margin-bottom: 6px; }
+  .hero-card .val { font-size: 15px; font-weight: 600; word-break: break-word; }
+  .hero-card .sub { font-size: 12px; color: #94a3b8; margin-top: 3px; }
+  .hero-card.risk-hero .val { font-size: 20px; }
+
+  /* Sections */
+  .sect { background: #1e293b; border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+  .sect-hd { padding: 12px 16px; background: #263449; cursor: pointer;
+             display: flex; justify-content: space-between; align-items: center;
+             user-select: none; }
+  .sect-hd:hover { background: #2d3f56; }
+  .sect-hd h3 { margin: 0; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .sect-hd .cnt { font-size: 11px; color: #94a3b8; background: #0f172a;
+                  padding: 2px 8px; border-radius: 10px; }
+  .sect-hd .arrow { transition: transform .2s; }
+  .sect.open .sect-hd .arrow { transform: rotate(90deg); }
+  .sect-body { padding: 14px 16px; display: none; }
+  .sect.open .sect-body { display: block; }
+
+  .kv { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; font-size: 12.5px; }
+  .kv .k { color: #94a3b8; }
+  .kv .v { color: #e2e8f0; word-break: break-word; font-family: ui-monospace, monospace; }
+  .kv .v code { background: #0f172a; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { padding: 3px 10px; border-radius: 12px; font-size: 11.5px;
+          background: #0f172a; border: 1px solid #334155; }
+  .chip.ok { border-color: #16a34a; color: #4ade80; }
+  .chip.warn { border-color: #dc2626; color: #f87171; }
+
+  .canvas-preview { display: inline-block; padding: 8px; background: #0f172a;
+                    border-radius: 6px; margin-top: 6px; font-size: 11px; color: #94a3b8; }
+  .canvas-preview img { display: block; max-width: 240px; height: auto; margin-top: 4px;
+                        background: white; border-radius: 3px; }
+
+  .risk-bar { position: relative; height: 8px; background: #334155;
+              border-radius: 4px; overflow: hidden; margin-top: 8px; }
+  .risk-bar .fill { height: 100%; transition: width .5s;
+                    background: linear-gradient(90deg, #4ade80, #f59e0b, #ef4444); }
+
+  details.raw { margin-top: 12px; }
+  details.raw summary { cursor: pointer; color: #94a3b8; font-size: 12px; }
+  details.raw pre { background: #0f172a; padding: 12px; border-radius: 6px;
+                    overflow: auto; max-height: 400px; font-size: 11px; }
+
+  .flag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .flag { padding: 4px 10px; border-radius: 4px; font-size: 12px;
+          background: rgba(239,68,68,.15); border: 1px solid #ef4444; color: #f87171; }
+
+  @media (max-width: 640px) {
+    .kv { grid-template-columns: 1fr; }
+    .kv .k { margin-top: 6px; }
+  }
 </style>
 </head>
 <body>
@@ -42,22 +114,32 @@
   <div class="stats" id="stats"></div>
   <table id="tbl">
     <thead><tr>
-      <th>时间</th><th>备注</th><th>visitorId</th><th>cross_id (设备)</th>
-      <th>IP</th><th>国家</th><th>风险</th><th>UA / 详情</th>
+      <th>时间</th><th>备注</th><th>设备摘要</th>
+      <th>visitorId</th><th>cross_id</th>
+      <th>IP</th><th>国家</th><th>风险</th><th></th>
     </tr></thead>
     <tbody id="tbody"></tbody>
   </table>
 
+  <!-- Detail Modal -->
+  <div class="modal-bg" id="modal" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="mtitle">指纹详情</h2>
+        <button class="close-btn" onclick="closeModal()">×</button>
+      </div>
+      <div id="mbody"></div>
+    </div>
+  </div>
+
 <script>
 const $ = (id) => document.getElementById(id);
-// 优先取 URL ?key=,其次 localStorage
+
 const urlKey = new URLSearchParams(location.search).get('key');
 $('key').value = urlKey || localStorage.getItem('admin_key') || '';
-if (urlKey) {
-  localStorage.setItem('admin_key', urlKey);
-  // 清掉 URL 里的 key,避免刷新/分享泄露
-  history.replaceState({}, '', location.pathname);
-}
+if (urlKey) { localStorage.setItem('admin_key', urlKey); history.replaceState({}, '', location.pathname); }
+
+let RECORDS = [];
 
 async function api(path) {
   const key = $('key').value.trim();
@@ -72,7 +154,8 @@ async function load() {
     $('msg').textContent = '加载中…';
     const [stats, all] = await Promise.all([api('/api/stats'), api('/api/all?limit=200')]);
     renderStats(stats);
-    renderTable(all.records);
+    RECORDS = all.records;
+    renderTable(RECORDS);
     $('msg').textContent = `共 ${all.total} 条,显示最近 ${all.count}`;
   } catch (e) {
     $('msg').textContent = '错误: ' + e.message;
@@ -94,26 +177,331 @@ function renderStats(s) {
   ).join('');
 }
 
+/* ---------- 表格 ---------- */
 function renderTable(rows) {
-  $('tbody').innerHTML = rows.map(r => {
-    const risk = r.bot_score >= 0.6 ? '<span class="risk-high">🔴 高</span>'
-               : r.bot_score >= 0.3 ? '<span class="risk-mid">🟡 中</span>'
-               : '<span class="risk-low">🟢 低</span>';
+  $('tbody').innerHTML = rows.map((r, i) => {
+    const risk = riskBadge(r.bot_score);
     const t = new Date(r.created_at).toLocaleString();
+    const dev = deviceSummary(r);
     return `<tr>
       <td>${t}</td>
-      <td>${escape(r.label || '-')}</td>
-      <td><code>${(r.visitor_id||'').slice(0,12)}…</code></td>
-      <td><code onclick="risk('${r.cross_id}')" style="cursor:pointer" title="点击反查">${(r.cross_id||'').slice(0,12)}…</code></td>
-      <td><code>${escape(r.ip||'')}</code></td>
-      <td>${r.ip_country||''}</td>
-      <td>${risk} (${(r.bot_score||0).toFixed(2)})</td>
-      <td><details><summary>${escape((r.user_agent||'').slice(0,40))}…</summary>
-          <pre>${escape(JSON.stringify(r.signals, null, 2))}</pre></details></td>
+      <td>${esc(r.label || '-')}</td>
+      <td><div style="font-size:12.5px">${dev.icon} <b>${esc(dev.os)}</b></div>
+          <div style="font-size:11px;color:#94a3b8">${esc(dev.browser)} · ${esc(dev.gpu)}</div></td>
+      <td><code>${(r.visitor_id||'').slice(0,10)}…</code></td>
+      <td><code onclick="risk('${r.cross_id}')" style="cursor:pointer" title="点击反查">${(r.cross_id||'').slice(0,10)}…</code></td>
+      <td><code>${esc(r.ip||'')}</code></td>
+      <td>${flagEmoji(r.ip_country)} ${r.ip_country||''}</td>
+      <td>${risk}</td>
+      <td><button class="link-btn" onclick="openDetail(${i})">查看</button></td>
     </tr>`;
   }).join('');
 }
 
+function riskBadge(score) {
+  score = score || 0;
+  const cls = score >= 0.6 ? 'risk-high' : score >= 0.3 ? 'risk-mid' : 'risk-low';
+  const icon = score >= 0.6 ? '🔴' : score >= 0.3 ? '🟡' : '🟢';
+  return `<span class="${cls}">${icon} ${score.toFixed(2)}</span>`;
+}
+
+function flagEmoji(cc) {
+  if (!cc || cc.length !== 2) return '';
+  return String.fromCodePoint(...[...cc.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+}
+
+function deviceSummary(r) {
+  const s = r.signals || {};
+  const ua = r.user_agent || '';
+  // OS
+  let os = 'Unknown', icon = '💻';
+  if (s.hardware?.userAgentData?.platform) os = s.hardware.userAgentData.platform;
+  else if (/Windows/i.test(ua)) { os = 'Windows'; }
+  else if (/Mac OS X|Macintosh/i.test(ua)) { os = 'macOS'; icon = '🍎'; }
+  else if (/Android/i.test(ua)) { os = 'Android'; icon = '📱'; }
+  else if (/iPhone|iPad|iOS/i.test(ua)) { os = 'iOS'; icon = '📱'; }
+  else if (/Linux/i.test(ua)) { os = 'Linux'; icon = '🐧'; }
+  if (os === 'macOS') icon = '🍎';
+  if (os === 'Windows') icon = '🪟';
+  if (s.hardware?.userAgentData?.platformVersion)
+    os += ` ${s.hardware.userAgentData.platformVersion}`;
+
+  // Browser
+  let browser = 'Unknown';
+  const brands = s.hardware?.userAgentData?.fullVersionList || s.hardware?.userAgentData?.brands || [];
+  const nonGoog = brands.find(b => !/Not.*Brand|Chromium/i.test(b.brand));
+  if (nonGoog) browser = `${nonGoog.brand} ${nonGoog.version || ''}`;
+  else if (/Firefox\/([\d.]+)/i.test(ua)) browser = `Firefox ${RegExp.$1}`;
+  else if (/Version\/([\d.]+).*Safari/i.test(ua)) browser = `Safari ${RegExp.$1}`;
+  else if (/Chrome\/([\d.]+)/i.test(ua)) browser = `Chrome ${RegExp.$1}`;
+
+  // GPU
+  const gpu = s.gpu?.renderer ? shortGPU(s.gpu.renderer) : 'N/A';
+  return { os, icon, browser, gpu };
+}
+
+function shortGPU(g) {
+  return g.replace(/ANGLE \(|Direct3D\d+ vs_[\d_]+ ps_[\d_]+\)|\)/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
+}
+
+/* ---------- 详情 Modal ---------- */
+function openDetail(idx) {
+  const r = RECORDS[idx];
+  const s = r.signals || {};
+  const dev = deviceSummary(r);
+  const server = s.server || {};
+  const cf = server.cf || {};
+
+  $('mtitle').textContent = `指纹详情 · ${r.label || 'session ' + r.session_id.slice(0,8)}`;
+
+  const hero = `
+    <div class="hero">
+      <div class="hero-card">
+        <div class="lbl">操作系统</div>
+        <div class="val">${dev.icon} ${esc(dev.os)}</div>
+        <div class="sub">${esc(s.hardware?.platform || '')}</div>
+      </div>
+      <div class="hero-card">
+        <div class="lbl">浏览器</div>
+        <div class="val">${esc(dev.browser)}</div>
+        <div class="sub">webdriver: ${s.webdriver ? '⚠️ true' : 'false'} · 隐身: ${r.incognito ? '是' : '否'}</div>
+      </div>
+      <div class="hero-card">
+        <div class="lbl">GPU</div>
+        <div class="val" style="font-size:13px">${esc(s.gpu?.renderer || 'N/A')}</div>
+        <div class="sub">${esc(s.gpu?.vendor || '')}</div>
+      </div>
+      <div class="hero-card">
+        <div class="lbl">屏幕</div>
+        <div class="val">${esc(s.screen?.resolution || '?')}</div>
+        <div class="sub">DPR ${s.screen?.dpr || '?'} · ${s.screen?.colorDepth || '?'}bit</div>
+      </div>
+      <div class="hero-card">
+        <div class="lbl">硬件</div>
+        <div class="val">${s.hardware?.cores || '?'} 核 · ${s.hardware?.memory || '?'}GB</div>
+        <div class="sub">触点 ${s.hardware?.touchPoints ?? 0}</div>
+      </div>
+      <div class="hero-card">
+        <div class="lbl">网络位置</div>
+        <div class="val">${flagEmoji(cf.country)} ${esc(cf.city || cf.country || '?')}</div>
+        <div class="sub"><code>${esc(r.ip)}</code> · ASN ${cf.asn || '?'}</div>
+      </div>
+      <div class="hero-card">
+        <div class="lbl">时区 / 语言</div>
+        <div class="val">${esc(s.timezone || '?')}</div>
+        <div class="sub">${esc((s.languages || [s.language]).join(', '))}</div>
+      </div>
+      <div class="hero-card risk-hero">
+        <div class="lbl">机器人风险</div>
+        <div class="val">${riskBadge(r.bot_score)}</div>
+        <div class="risk-bar"><div class="fill" style="width:${(r.bot_score * 100).toFixed(0)}%"></div></div>
+      </div>
+    </div>
+  `;
+
+  const sections = [
+    section('🖥️ 硬件详情', kvGrid({
+      'GPU vendor':      s.gpu?.vendor,
+      'GPU renderer':    s.gpu?.renderer,
+      'WebGL version':   s.gpu?.version,
+      'GLSL':            s.gpu?.shadingLanguage,
+      'Max texture':     s.gpu?.maxTextureSize,
+      'WebGL 扩展数':    s.gpu?.extensions?.length,
+      'WebGPU':          s.webgpu?.supported ? `${s.webgpu.info?.vendor || ''} ${s.webgpu.info?.architecture || ''} ${s.webgpu.info?.device || ''}` : '不支持',
+      '音频指纹':        s.audio?.fingerprint,
+      '采样率':          s.audio?.sampleRate ? `${s.audio.sampleRate} Hz` : null,
+      '电池':            s.battery ? `${(s.battery.level*100).toFixed(0)}% ${s.battery.charging ? '充电中' : ''}` : '不支持',
+      '存储配额':        s.storage?.quota ? formatBytes(s.storage.quota) : null,
+    })),
+
+    section('🌐 系统 & 区域', kvGrid({
+      '平台':          s.hardware?.platform,
+      'UA-CH 架构':    `${s.hardware?.userAgentData?.architecture || '?'} ${s.hardware?.userAgentData?.bitness || ''}`,
+      '型号':          s.hardware?.userAgentData?.model,
+      '系统版本':      s.hardware?.userAgentData?.platformVersion,
+      '完整浏览器':    (s.hardware?.userAgentData?.fullVersionList || []).map(b => `${b.brand}/${b.version}`).join(', '),
+      '时区':          `${s.timezone} (UTC${s.timezoneOffset >= 0 ? '-' : '+'}${Math.abs(s.timezoneOffset/60)})`,
+      '语言链':        (s.languages || []).join(', '),
+      '主语言':        s.language,
+      '数字系统':      s.numberingSystem,
+      '日历':          s.calendar,
+      '键盘布局':      s.keyboard ? `${Object.keys(s.keyboard).length} 键映射` : '不支持',
+    })),
+
+    section('🎨 CSS 媒体查询', chipList(s.cssMedia)),
+
+    section('📽️ 视频编解码', codecList(s.codecs?.video)),
+    section('🎵 音频编解码', codecList(s.codecs?.audio)),
+    section('🔐 DRM / EME', drmList(s.eme)),
+
+    section('🔤 字体检测 · ' + (s.fonts?.count || 0) + ' 项', chipListArr(s.fonts?.list)),
+
+    section('🎙️ 语音合成 · ' + (s.voices?.length || 0) + ' 项',
+      s.voices?.length ? kvGrid(Object.fromEntries(s.voices.slice(0, 15).map(v => [v.name, `${v.lang} ${v.localService ? '(本地)' : ''}`]))) : '<div style="color:#94a3b8">无</div>'),
+
+    section('🎥 媒体设备', s.media ? kvGrid({
+      '音频输入': s.media.counts?.audioinput,
+      '视频输入': s.media.counts?.videoinput,
+      '音频输出': s.media.counts?.audiooutput,
+      '总数':     s.media.total,
+    }) : '<div style="color:#94a3b8">无</div>'),
+
+    section('🕸️ WebRTC', s.webrtc ? kvGrid({
+      'IP 列表':     (s.webrtc.ips || []).join(', ') || '无',
+      'ICE 候选数':  s.webrtc.candidates?.length,
+      '编解码':      (s.webrtc.codecs || []).join(', '),
+    }) : ''),
+
+    section('🌐 网络', s.connection ? kvGrid(s.connection) : '<div style="color:#94a3b8">未暴露 Connection API</div>'),
+
+    section('🖼️ Canvas 指纹', canvasPreview(s)),
+
+    section('🤖 反自动化检测', chipList({
+      'webdriver': s.webdriver,
+      'headless UA': s.headless?.userAgentHasHeadless,
+      '零语言': s.headless?.languages0,
+      '零外部尺寸': s.headless?.outerDimensionsZero,
+      'Chrome 无插件': s.headless?.pluginsEmptyOnChrome,
+      'CDC 变量': s.automationHooks?.cdc,
+      'automation hits': (s.automationHooks?.hits || []).length,
+    })),
+
+    section('🕰️ 时钟抖动', s.clockJitter ? kvGrid({
+      '最小步进 (ms)': s.clockJitter.min,
+      '中位数':        s.clockJitter.median,
+      '最大':          s.clockJitter.max,
+      '样本':          (s.clockJitter.sample || []).join(', '),
+    }) : ''),
+
+    section('⚙️ 原生函数完整性', chipList(s.nativeFunctionIntegrity)),
+
+    section('🔑 权限', chipList(s.permissions)),
+
+    section('🌍 服务端 / CF 边缘', kvGrid({
+      'HTTP 协议':      cf.httpProtocol,
+      'TLS 版本':       cf.tlsVersion,
+      'TLS Cipher':     cf.tlsCipher,
+      'ASN':            cf.asn ? `${cf.asn} (${cf.asOrganization || ''})` : null,
+      '边缘节点':       cf.colo,
+      '国家 / 城市':    `${cf.country || '?'} / ${cf.city || '?'}`,
+      '经纬度':         cf.latitude && cf.longitude ? `${cf.latitude}, ${cf.longitude}` : null,
+      'TCP RTT':        cf.clientTcpRtt ? `${cf.clientTcpRtt} ms` : null,
+      '威胁分':         cf.threatScore,
+    })),
+
+    section('📋 请求头', kvGrid(server.headers || {})),
+
+    section('🔬 数学指纹', kvGrid(s.math || {})),
+  ];
+
+  const flags = getRiskFlags(r, s);
+
+  $('mbody').innerHTML = hero
+    + (flags.length ? `<div class="flag-list">${flags.map(f => `<span class="flag">⚠️ ${esc(f)}</span>`).join('')}</div>` : '')
+    + `<div style="margin: 20px 0 12px; padding: 12px; background: #1e293b; border-radius: 6px; font-size: 12px;">
+         <span style="color:#94a3b8">User-Agent:</span> <code style="white-space:pre-wrap">${esc(r.user_agent || '')}</code>
+       </div>`
+    + sections.join('')
+    + `<details class="raw"><summary>展开原始 signals JSON</summary>
+         <pre>${esc(JSON.stringify(s, null, 2))}</pre></details>`;
+
+  // 默认展开前两个
+  document.querySelectorAll('#mbody .sect').forEach((el, i) => { if (i < 2) el.classList.add('open'); });
+
+  $('modal').classList.add('open');
+}
+
+function closeModal() { $('modal').classList.remove('open'); }
+
+function section(title, body) {
+  return `<div class="sect">
+    <div class="sect-hd" onclick="this.parentElement.classList.toggle('open')">
+      <h3><span class="arrow">▶</span> ${title}</h3>
+    </div>
+    <div class="sect-body">${body}</div>
+  </div>`;
+}
+
+function kvGrid(obj) {
+  if (!obj) return '<div style="color:#94a3b8">无</div>';
+  const entries = Object.entries(obj).filter(([, v]) => v !== null && v !== undefined && v !== '');
+  if (!entries.length) return '<div style="color:#94a3b8">无</div>';
+  return `<div class="kv">${
+    entries.map(([k, v]) => `<div class="k">${esc(k)}</div><div class="v">${esc(String(v))}</div>`).join('')
+  }</div>`;
+}
+
+function chipList(obj) {
+  if (!obj) return '<div style="color:#94a3b8">无</div>';
+  const entries = Object.entries(obj);
+  return `<div class="chips">${
+    entries.map(([k, v]) => {
+      const truthy = v === true || v === 'granted' || (typeof v === 'number' && v > 0);
+      const cls = truthy ? 'ok' : (v === false || v === 'denied' ? 'warn' : '');
+      return `<span class="chip ${cls}">${esc(k)}${v === true || v === false ? '' : ': ' + esc(String(v).slice(0,20))}</span>`;
+    }).join('')
+  }</div>`;
+}
+
+function chipListArr(arr) {
+  if (!arr || !arr.length) return '<div style="color:#94a3b8">无</div>';
+  return `<div class="chips">${arr.map(f => `<span class="chip ok">${esc(f)}</span>`).join('')}</div>`;
+}
+
+function codecList(obj) {
+  if (!obj) return '<div style="color:#94a3b8">无</div>';
+  return `<div class="chips">${
+    Object.entries(obj).map(([codec, support]) => {
+      const cls = support === 'probably' ? 'ok' : support === 'maybe' ? '' : 'warn';
+      const label = codec.replace(/^(video|audio)\//, '').replace(/;\s*codecs="([^"]+)".*/, ' $1');
+      return `<span class="chip ${cls}" title="${esc(support || 'no')}">${esc(label)}</span>`;
+    }).join('')
+  }</div>`;
+}
+
+function drmList(obj) {
+  if (!obj) return '<div style="color:#94a3b8">无</div>';
+  return `<div class="chips">${
+    Object.entries(obj).map(([sys, v]) => {
+      const name = sys.replace('com.widevine.alpha', 'Widevine')
+        .replace('com.microsoft.playready', 'PlayReady')
+        .replace('com.apple.fps.1_0', 'FairPlay 1.0')
+        .replace('com.apple.fps.2_0', 'FairPlay 2.0')
+        .replace('org.w3.clearkey', 'ClearKey');
+      return `<span class="chip ${v?.supported ? 'ok' : 'warn'}">${esc(name)}</span>`;
+    }).join('')
+  }</div>`;
+}
+
+function canvasPreview(s) {
+  const items = [];
+  if (s.canvas2d) items.push(`<div class="canvas-preview">Canvas 2D 哈希<br><code>…${esc(s.canvas2d.slice(-32))}</code></div>`);
+  if (s.canvasEmoji) items.push(`<div class="canvas-preview">Canvas Emoji 哈希<br><code>…${esc(s.canvasEmoji.slice(-32))}</code></div>`);
+  if (s.textMetrics) items.push(`<div class="canvas-preview">文本度量<br>width: ${s.textMetrics.width?.toFixed(3)}<br>fontBoundingBoxAscent: ${s.textMetrics.fontBoundingBoxAscent?.toFixed(3)}</div>`);
+  return items.length ? items.join(' ') : '<div style="color:#94a3b8">无</div>';
+}
+
+function getRiskFlags(r, s) {
+  const flags = [];
+  if (s.webdriver) flags.push('检测到 navigator.webdriver');
+  if (s.headless?.userAgentHasHeadless) flags.push('UA 含 Headless');
+  if (s.automationHooks?.cdc) flags.push('检测到 Puppeteer CDC 变量');
+  if ((s.automationHooks?.hits || []).length) flags.push(`自动化框架痕迹: ${s.automationHooks.hits.join(', ')}`);
+  if (r.incognito) flags.push('隐身模式');
+  if (/swiftshader|llvmpipe/i.test(s.gpu?.renderer || '')) flags.push('软件渲染 (可能是虚拟机/无 GPU)');
+  if ((s.plugins || []).length === 0 && /chrome/i.test(r.user_agent || '')) flags.push('Chrome 但无插件');
+  if (s.headless?.outerDimensionsZero) flags.push('外部窗口尺寸为 0');
+  return flags;
+}
+
+function formatBytes(n) {
+  const u = ['B','KB','MB','GB','TB'];
+  let i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return n.toFixed(2) + ' ' + u[i];
+}
+
+/* ---------- 反查 ---------- */
 async function risk(crossId) {
   const r = await api('/api/risk?cross=' + crossId);
   alert(`设备 ${crossId.slice(0,16)}…\n命中: ${r.total_hits}\n关联 session: ${r.distinct_sessions}\n关联 IP: ${r.distinct_ips.join(', ')}\n风险标签: ${r.risk_flags.join(', ') || '无'}`);
@@ -124,7 +512,9 @@ function exportCSV() {
   window.open('/api/all?format=csv&limit=1000&key=' + encodeURIComponent(key));
 }
 
-function escape(s) { return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function esc(s) { return String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
 if ($('key').value) load();
 </script>
