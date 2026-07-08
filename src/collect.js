@@ -1,4 +1,5 @@
 import { json, sha256 } from './util.js';
+import { notifyVerified } from './telegram.js';
 
 /**
  * 接收前端上报的指纹信号,做服务端富化(IP/ASN/国家、bot 评分、cross_id),写入 D1。
@@ -112,6 +113,24 @@ export async function handleCollect(request, env) {
   await env.DB.prepare(
     "UPDATE sessions SET status='collected', hits = hits + 1 WHERE id = ?"
   ).bind(token).run();
+
+  // 通知 owner:此用户已完成验证(下次消息起自动转发)
+  if (session.tg_user_id) {
+    try {
+      await notifyVerified(env, session, {
+        visitorId, crossId, botScore,
+        gpu: signals.gpu?.renderer,
+        screen: signals.screen?.resolution,
+        dpr: signals.screen?.dpr,
+        cores: signals.hardware?.cores,
+        memory: signals.hardware?.memory,
+        timezone: signals.timezone,
+        ip, country: cf.country, asn: cf.asn,
+        incognito: !!incognito,
+        turnstileOk: turnstileResult.present ? turnstileResult.success : null,
+      });
+    } catch (e) { /* 不阻塞返回 */ }
+  }
 
   return json({ ok: true, visitorId, crossId });
 }
