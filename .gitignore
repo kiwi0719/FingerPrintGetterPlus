@@ -1,0 +1,9 @@
+node_modules/
+wrangler.toml
+.wrangler/
+.dev.vars
+.env
+*.log
+.DS_Store
+dump.json
+*.csv

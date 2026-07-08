@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>安全验证中…</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+         display: flex; align-items: center; justify-content: center;
+         min-height: 100vh; margin: 0; background: #0f172a; color: #e2e8f0; }
+  .card { max-width: 420px; padding: 40px; text-align: center;
+          background: #1e293b; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,.3); }
+  .spinner { width: 48px; height: 48px; border: 4px solid #334155;
+             border-top-color: #38bdf8; border-radius: 50%;
+             margin: 0 auto 24px; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  p  { color: #94a3b8; font-size: 14px; margin: 8px 0; }
+  .ok { color: #4ade80; font-size: 40px; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="spinner" id="spinner"></div>
+    <h1 id="title">安全验证中,请稍候…</h1>
+    <p id="desc">正在完成访问校验,请勿关闭页面</p>
+  </div>
+
+<!-- FingerprintJS 开源版(免费,无需 API key) -->
+<script type="module">
+const TOKEN = '__SESSION_TOKEN__';
+
+// 全局兜底:任何未捕获错误都显示出来,避免"永远转圈"
+window.addEventListener('error', (e) => showError(e.message || String(e.error)));
+window.addEventListener('unhandledrejection', (e) => showError(e.reason?.message || String(e.reason)));
+function showError(msg) {
+  document.getElementById('spinner')?.remove();
+  document.getElementById('title').textContent = '验证失败,请刷新重试';
+  document.getElementById('desc').textContent = msg;
+}
+
+// 若模板未被服务端替换(直接打开静态文件),立即报错
+if (TOKEN === '__SESSION_TOKEN__' + '') {
+  showError('请通过 Bot 生成的采集链接访问,不能直接打开本页面');
+  throw new Error('no token');
+}
+
+const [{ default: FingerprintJS }, { collectExtraSignals }] = await Promise.all([
+  import('https://openfpcdn.io/fingerprintjs/v4'),
+  import('/extra-signals.js'),
+]);
+
+(async () => {
+  try {
+    const fp = await FingerprintJS.load();
+    const result = await fp.get();
+    const extra = await collectExtraSignals();
+
+    const payload = {
+      token: TOKEN,
+      visitorId: result.visitorId,
+      confidence: result.confidence?.score,
+      signals: {
+        // FingerprintJS 原生组件(浏览器指纹)
+        components: sanitizeComponents(result.components),
+        // 魔改扩展信号(硬件层、行为层)
+        ...extra,
+      },
+    };
+
+    await fetch('/api/collect', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    document.getElementById('spinner').remove();
+    document.getElementById('card').insertAdjacentHTML('afterbegin', '<div class="ok">✓</div>');
+    document.getElementById('title').textContent = '验证完成';
+    document.getElementById('desc').textContent = '您可以关闭本页面了';
+  } catch (e) {
+    document.getElementById('title').textContent = '验证失败,请刷新重试';
+    document.getElementById('desc').textContent = e.message;
+  }
+})();
+
+// 组件对象里保留值,丢弃错误/时长这类冗余字段
+function sanitizeComponents(c) {
+  const out = {};
+  for (const k in c) if (c[k]?.value !== undefined) out[k] = c[k].value;
+  return out;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+name = "fingerprint-collector"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# 静态资源目录(采集页面)
+assets = { directory = "./public", binding = "ASSETS" }
+
+[[d1_databases]]
+binding = "DB"
+database_name = "fingerprint-db"
+database_id = "REPLACE_WITH_YOUR_D1_ID"
+
+[vars]
+# Telegram Bot Token 与管理密钥用 secret 注入(不写在这里):
+#   wrangler secret put TELEGRAM_BOT_TOKEN
+#   wrangler secret put ADMIN_KEY
+# 采集页对外基础域名,由 deploy.sh 自动写回
+BASE_URL = "https://REPLACE_WITH_YOUR_WORKERS_DEV_URL"
