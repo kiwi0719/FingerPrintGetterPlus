@@ -402,6 +402,14 @@ function openDetail(idx) {
       '威胁分':         cf.threatScore,
     })),
 
+    section('🛡️ Turnstile 校验', kvGrid({
+      '是否提交':  server.turnstile?.present ? '是' : '否',
+      '通过':      server.turnstile?.success === true ? '✅ 通过' : server.turnstile?.success === false ? '❌ 未通过' : '未验证',
+      '错误码':    (server.turnstile?.errorCodes || []).join(', '),
+      '时间戳':    server.turnstile?.challengeTs,
+      'hostname':  server.turnstile?.hostname,
+    })),
+
     section('📋 请求头', kvGrid(server.headers || {})),
 
     section('🔬 数学指纹', kvGrid(s.math || {})),

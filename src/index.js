@@ -80,6 +80,7 @@ async function servePage(token, env) {
   const asset = await env.ASSETS.fetch(new URL('https://assets/collect.html'));
   let html = await asset.text();
   // 注入 token 供前端上报使用
-  html = html.replace('__SESSION_TOKEN__', token);
+  html = html.replace('__SESSION_TOKEN__', token)
+             .replace('__TURNSTILE_SITEKEY__', env.TURNSTILE_SITEKEY || '');
   return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
 }

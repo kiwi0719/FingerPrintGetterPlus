@@ -11,8 +11,12 @@ database_name = "fingerprint-db"
 database_id = "REPLACE_WITH_YOUR_D1_ID"
 
 [vars]
-# Telegram Bot Token 与管理密钥用 secret 注入(不写在这里):
+# Telegram Bot Token / 管理密钥 / Turnstile secret 用 secret 注入:
 #   wrangler secret put TELEGRAM_BOT_TOKEN
 #   wrangler secret put ADMIN_KEY
+#   wrangler secret put TURNSTILE_SECRET
 # 采集页对外基础域名,由 deploy.sh 自动写回
 BASE_URL = "https://REPLACE_WITH_YOUR_WORKERS_DEV_URL"
+# Turnstile sitekey (公开,前端用)。默认为 CF 官方"总是通过"的测试密钥。
+# 生产环境请到 https://dash.cloudflare.com/?to=/:account/turnstile 创建自己的 widget。
+TURNSTILE_SITEKEY = "1x00000000000000000000AA"

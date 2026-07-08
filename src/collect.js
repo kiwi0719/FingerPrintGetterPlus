@@ -11,7 +11,7 @@ export async function handleCollect(request, env) {
     return json({ error: 'bad_json' }, 400);
   }
 
-  const { token, visitorId, confidence, signals } = body || {};
+  const { token, visitorId, confidence, signals, turnstileToken } = body || {};
   if (!token || !signals) return json({ error: 'missing_fields' }, 400);
 
   const session = await env.DB.prepare('SELECT * FROM sessions WHERE id = ?').bind(token).first();
@@ -38,8 +38,35 @@ export async function handleCollect(request, env) {
   }
 
   // 富化 signals:把服务端补齐的信息一并塞进 signals_json
+  // Turnstile 服务端校验(独立,不影响指纹保存)
+  let turnstileResult = { present: !!turnstileToken };
+  if (turnstileToken && env.TURNSTILE_SECRET) {
+    try {
+      const form = new FormData();
+      form.append('secret', env.TURNSTILE_SECRET);
+      form.append('response', turnstileToken);
+      form.append('remoteip', ip);
+      const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST', body: form,
+      });
+      const j = await r.json();
+      turnstileResult = {
+        present: true,
+        success: j.success,
+        errorCodes: j['error-codes'],
+        challengeTs: j.challenge_ts,
+        hostname: j.hostname,
+        action: j.action,
+        cdata: j.cdata,
+      };
+    } catch (e) {
+      turnstileResult = { present: true, success: false, error: String(e) };
+    }
+  }
+
   signals.server = {
     headers,
+    turnstile: turnstileResult,
     cf: {
       country: cf.country, city: cf.city, region: cf.region, continent: cf.continent,
       postalCode: cf.postalCode, latitude: cf.latitude, longitude: cf.longitude,
