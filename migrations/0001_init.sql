@@ -3,6 +3,9 @@ CREATE TABLE IF NOT EXISTS sessions (
   id           TEXT PRIMARY KEY,        -- 随机 token,进采集链接
   label        TEXT,                    -- 备注(如订单号、用户名)
   tg_chat_id   TEXT,                    -- 发起采集的 TG chat,用于回推结果
+  tg_user_id   TEXT,                    -- 发起者 TG user id
+  tg_username  TEXT,                    -- 发起者 @username(可能为空)
+  tg_first_name TEXT,                   -- 发起者显示名
   created_at   INTEGER NOT NULL,
   status       TEXT NOT NULL DEFAULT 'pending', -- pending | collected
   hits         INTEGER NOT NULL DEFAULT 0

@@ -114,7 +114,7 @@
   <div class="stats" id="stats"></div>
   <table id="tbl">
     <thead><tr>
-      <th>时间</th><th>备注</th><th>设备摘要</th>
+      <th>时间</th><th>发起人 (TG)</th><th>备注</th><th>设备摘要</th>
       <th>visitorId</th><th>cross_id</th>
       <th>IP</th><th>国家</th><th>风险</th><th></th>
     </tr></thead>
@@ -183,8 +183,10 @@ function renderTable(rows) {
     const risk = riskBadge(r.bot_score);
     const t = new Date(r.created_at).toLocaleString();
     const dev = deviceSummary(r);
+    const tg = tgCell(r);
     return `<tr>
       <td>${t}</td>
+      <td>${tg}</td>
       <td>${esc(r.label || '-')}</td>
       <td><div style="font-size:12.5px">${dev.icon} <b>${esc(dev.os)}</b></div>
           <div style="font-size:11px;color:#94a3b8">${esc(dev.browser)} · ${esc(dev.gpu)}</div></td>
@@ -196,6 +198,17 @@ function renderTable(rows) {
       <td><button class="link-btn" onclick="openDetail(${i})">查看</button></td>
     </tr>`;
   }).join('');
+}
+
+function tgCell(r) {
+  const name = r.tg_first_name || '';
+  const uname = r.tg_username ? `@${r.tg_username}` : '';
+  const uid = r.tg_user_id || '';
+  const link = r.tg_username
+    ? `<a href="https://t.me/${esc(r.tg_username)}" target="_blank" style="color:#38bdf8">${esc(uname)}</a>`
+    : (uid ? `<a href="tg://user?id=${esc(uid)}" style="color:#38bdf8">${esc(uid)}</a>` : '-');
+  return `<div style="font-size:12.5px"><b>${esc(name)}</b></div>
+          <div style="font-size:11px;color:#94a3b8">${link}${uid ? ` · id:<code>${esc(uid)}</code>` : ''}</div>`;
 }
 
 function riskBadge(score) {
