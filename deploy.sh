@@ -25,7 +25,7 @@ CF_TOKEN="${CLOUDFLARE_API_TOKEN:-}"
 CF_ACCOUNT="${CLOUDFLARE_ACCOUNT_ID:-}"
 TG_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 ADMIN_KEY_ARG="${ADMIN_KEY:-}"
-WORKER_NAME="${WORKER_NAME:-fingerprint-collector}"
+WORKER_NAME="${WORKER_NAME:-verification}"
 DB_NAME="${DB_NAME:-fingerprint-db}"
 
 # 命令行参数解析(支持 --key=val / --key val / -x val)
