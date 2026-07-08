@@ -225,6 +225,12 @@ export async function notifyVerified(env, session, fp) {
     `<i>此人后续消息将自动转发到本对话,直接回复即可对话。</i>`;
 
   await sendMessage(env, ownerChatId, text);
+
+  // 也通知目标用户:验证已完成
+  if (session.tg_chat_id) {
+    await sendMessage(env, session.tg_chat_id,
+      `✅ 验证完成!现在可以直接发消息了,我会转达给对方。`);
+  }
 }
 
 /* -------- 底层 -------- */
