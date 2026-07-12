@@ -33,11 +33,19 @@
 | 字段 | 含义 | 稳定性 |
 |---|---|---|
 | `visitorId` | FingerprintJS 生成的浏览器身份 ID | 同浏览器稳定,换浏览器变化 |
-| `cross_id` | 仅用硬件层信号(GPU/分辨率/字体/音频/CPU)哈希 | **同设备跨浏览器一致** |
+| `hw_id` | **纯硬件层**哈希:GPU(canonical)/WebGPU adapter/音频硬件参数/屏幕物理参数 | **同物理机跨浏览器 + 跨网络都一致** |
+| `os_id` | `hw_id` + 系统字体集 + 时区 + 系统语言 + platform version | 换网络仍一致,重装系统会变 |
+| `cross_id` | `os_id` + 客户端 IP | 与旧版一致,换网络会变(保留兼容) |
 | `bot_score` | 自动化/机器人可疑度 0(真人)~1(高度可疑) | 每次采集独立评估 |
 | `session_id` | 一次采集链接的 token,一个链接可被多次访问 | — |
 
-组合应用:同一个 `cross_id` 关联到 N 个不同 `visitorId` → 同人换浏览器;同一个 `cross_id` 关联到 N 个不同账号 → 账号复用/团伙识别。
+**用哪个查**:
+- 想识别「同人换浏览器」→ `hw_id`(推荐)
+- 想识别「同人换网络 + 换浏览器」→ `hw_id`
+- 想识别「重装系统前后同一台机」→ `hw_id`(纯硬件不会变)
+- 严格匹配旧行为 → `cross_id`
+
+除了精确匹配,`/api/risk` 还会用 **单字段相似度打分 + 字体 bitmap 汉明距离** 做模糊匹配,允许 1-2 个字段漂移(比如换显示器只改了 `screen_res`)。
 
 ## 采集的信号
 
@@ -196,13 +204,20 @@ curl -H "x-admin-key: $KEY" "$BASE/api/sessions?limit=50&status=collected"
 # 单个会话的所有上报(同一链接被多浏览器打开时会有多条)
 curl -H "x-admin-key: $KEY" "$BASE/api/session/<token>"
 
-# 风控反查(cross_id / visitorId / IP 三种)
-curl -H "x-admin-key: $KEY" "$BASE/api/risk?cross=<cross_id>"
+# 风控反查(五种维度,任选其一)
+curl -H "x-admin-key: $KEY" "$BASE/api/risk?hw=<hw_id>"          # 推荐:跨浏览器+跨网络同物理机
+curl -H "x-admin-key: $KEY" "$BASE/api/risk?os=<os_id>"          # 硬件+系统匹配(跨网络)
+curl -H "x-admin-key: $KEY" "$BASE/api/risk?cross=<cross_id>"    # 严格匹配(含 IP)
 curl -H "x-admin-key: $KEY" "$BASE/api/risk?visitorId=<visitorId>"
 curl -H "x-admin-key: $KEY" "$BASE/api/risk?ip=1.2.3.4"
 ```
 
-反查返回:命中次数、关联的 session/IP/visitor 列表、以及**风险标签**。
+反查返回三段:
+- `exact` —— 与所查标识精确一致的历史命中
+- `same_hw` —— 同 `hw_id`(跨浏览器/跨网络同物理机)
+- `similar` —— 硬件字段 + 字体 bitmap 汉明距离打分(总分 ≥ 4/10),每条带 `_match.parts` 展示各分项得分
+
+以及关联的 session/IP/visitor 列表和**风险标签**。
 
 ### 直接查 D1 数据库
 
@@ -241,18 +256,24 @@ npx wrangler d1 execute fingerprint-db --remote --json \
 
 **`visitorId`** 由 FingerprintJS 生成,基于大量浏览器可观察信号(Canvas、字体列表、userAgent、语言、时区、屏幕、插件等)。同一设备切换浏览器后,userAgent、语言、字体渲染细节都会变,所以 `visitorId` 会**不同**。
 
-**`cross_id`** 由本项目在服务端生成:只取「**换浏览器不会变**」的硬件/系统级信号:
-- GPU renderer(显卡型号,取自 `WEBGL_debug_renderer_info`)
-- 物理分辨率、色深
-- CPU 核数、内存
-- 时区
-- AudioContext 指纹(音频处理硬件的数值特征)
-- 系统字体集合(所有浏览器看到的都是同一份 OS 字体)
-- 客户端 IP(同网络加权,但换网络也会有其它信号补足)
+**分层 ID(hw_id / os_id / cross_id)** 由本项目在服务端生成,分别用不同稳定性的字段:
 
-对这些拼接做 SHA-256 → `cross_id`。**同设备用 Chrome / Firefox / Safari 打开同一链接,cross_id 一致;visitorId 不同。** 这就是"跨浏览器识别同一物理设备"的核心。
+`hw_id` —— 纯硬件层,SHA-256:
+- GPU canonical(去掉驱动版本/D3D shader model 尾巴)+ vendor + WebGL extensions 排序集合 + `MAX_TEXTURE_SIZE`
+- WebGPU adapter info(vendor/architecture)—— Safari 打码 GPU 时的兜底
+- Audio fingerprint + `sampleRate` + `baseLatency`
+- 屏幕物理分辨率 + colorDepth
 
-若要验证:让同一台电脑用两个不同浏览器打开同一采集链接,去管理后台看,会有两条记录,`visitorId` 不同但 `cross_id` 一致。
+`os_id = SHA-256(hw_id | 字体精确哈希 | 时区 | UA-CH platform+version | 语言集)`
+
+`cross_id = SHA-256(os_id | ip)` —— 与旧版行为一致。
+
+**注意点**:
+- `hardware.cores` 和 `hardware.memory` **不进哈希**(现代浏览器只返回几档固定值,熵极低)。单独存列供打分参考。
+- GPU renderer 用 `canonicalGpu()` 规范化(见 [src/fonts.js](FingerPrintGetterPlus/src/fonts.js))去掉版本号 —— 同机不同驱动版本才能匹配上。
+- 字体除了原有精确 hash,还编码成 **128-bit bitmap**(`fonts_bitmap`),`/api/risk` 用**汉明距离**做模糊匹配 —— 允许 1-2 个字体差异不算掉链。
+
+若要验证:同一台电脑用两个不同浏览器打开同一采集链接 → `visitorId` 不同,但 `hw_id` / `os_id` / `cross_id` 全一致;换 WiFi 再打开 → `cross_id` 变了,`hw_id` / `os_id` 仍一致。
 
 ---
 
@@ -264,6 +285,7 @@ npx wrangler d1 execute fingerprint-db --remote --json \
 |---|---|
 | `same_device_many_sessions` | 同一设备被采集了 3+ 次 → 可能账号复用 / 多开 |
 | `device_ip_hopping` | 同一设备用过 3+ 个不同 IP → VPN/代理频繁切换 |
+| `cross_asn_device` | 同设备用过 3+ 个不同 ASN → 跨机房/跨运营商代理 |
 | `automation_suspected` | 出现过 bot_score ≥ 0.6 的记录 → 疑似自动化 |
 | `incognito_seen` | 出现过隐身模式访问 → 规避 cookie 追踪嫌疑 |
 
@@ -321,12 +343,14 @@ FingerPrintGetterPlus/
 ├── migrations/                D1 迁移(deploy.sh 用 _migrations 表跟踪已应用项)
 │   ├── 0001_init.sql          sessions + fingerprints
 │   ├── 0002_tg_user.sql       sessions 补 tg_user_id/username/first_name
-│   └── 0003_relay.sql         users + config + relay_map(双向中继)
+│   ├── 0003_relay.sql         users + config + relay_map(双向中继)
+│   └── 0004_layered_ids.sql   hw_id / os_id + 关键字段单列 + 字体 bitmap
 ├── src/                       Worker 后端
 │   ├── index.js               路由入口 + 静态资源 fallback
 │   ├── util.js                JSON / CORS / 随机 token / SHA256 / 鉴权
-│   ├── collect.js             接收上报 + 服务端富化 + 生成 cross_id + bot_score
-│   ├── risk.js                风控反查 + 全量导出 + 汇总统计 + 会话列表
+│   ├── fonts.js               canonical 字体列表 + bitmap + 汉明距离 + GPU canonical 化
+│   ├── collect.js             接收上报 + 服务端富化 + 生成 hw_id/os_id/cross_id + bot_score
+│   ├── risk.js                风控反查(精确 + 同 hw_id + 相似度) + 全量导出 + 汇总统计
 │   └── telegram.js            TG Bot(任何消息都返回采集链接)
 └── public/                    Cloudflare Workers Assets
     ├── collect.html           采集页(伪装"安全验证中")

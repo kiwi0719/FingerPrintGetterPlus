@@ -1,5 +1,6 @@
 import { json, sha256 } from './util.js';
 import { notifyVerified } from './telegram.js';
+import { fontsToBitmap, canonicalGpu } from './fonts.js';
 
 /**
  * 接收前端上报的指纹信号,做服务端富化(IP/ASN/国家、bot 评分、cross_id),写入 D1。
@@ -81,19 +82,46 @@ export async function handleCollect(request, env) {
     },
   };
 
-  // 跨浏览器 ID:仅取与浏览器无关的硬件/系统层信号,做稳定哈希
-  const crossBasis = [
-    signals.gpu?.renderer,       // 显卡型号(WebGL)
-    signals.screen?.resolution,  // 物理分辨率
-    signals.screen?.colorDepth,
-    signals.hardware?.cores,
-    signals.hardware?.memory,
-    signals.timezone,
-    signals.audio?.fingerprint,  // 音频栈指纹(硬件相关)
-    signals.fonts?.hash,         // 系统字体集(跨浏览器较稳定)
-    ip,                          // 同网络加权
+  // ---- 分层设备 ID ----
+  // hw_id:纯硬件层,换浏览器 + 换网络都稳定;不含 cores/memory(现代浏览器熵极低)
+  // os_id:hw_id + OS/字体/时区/语言,换网络仍稳定,换系统会变
+  // cross_id:os_id + IP,与旧版语义等价,保留兼容
+  const gpuCanon = canonicalGpu(signals.gpu?.renderer);
+  const audioFp = signals.audio?.fingerprint || '';
+  const screenRes = signals.screen?.resolution || '';
+  const fontsBitmap = fontsToBitmap(signals.fonts?.list || []);
+  const fontsHash = signals.fonts?.hash || '';
+  const cores = signals.hardware?.cores ?? null;
+  const memory = signals.hardware?.memory ?? null;
+  const timezone = signals.timezone || '';
+  const uacd = signals.hardware?.userAgentData || {};
+
+  const hwBasis = [
+    gpuCanon,
+    signals.gpu?.vendor || '',
+    (signals.gpu?.extensions || []).slice().sort().join(','),
+    signals.gpu?.maxTextureSize || '',
+    signals.webgpu?.info?.vendor || '',
+    signals.webgpu?.info?.architecture || '',
+    audioFp,
+    signals.audio?.sampleRate ?? '',
+    signals.audio?.baseLatency ?? '',
+    screenRes,
+    signals.screen?.colorDepth ?? '',
   ].join('|');
-  const crossId = await sha256(crossBasis);
+  const hwId = await sha256(hwBasis);
+
+  const osBasis = [
+    hwId,
+    fontsHash,
+    timezone,
+    uacd.platform || '',
+    uacd.platformVersion || '',
+    (signals.languages || []).slice().sort().join(','),
+  ].join('|');
+  const osId = await sha256(osBasis);
+
+  const crossId = await sha256([osId, ip].join('|'));
 
   const botScore = computeBotScore(signals, ua, cf);
   const incognito = signals.incognito ? 1 : 0;
@@ -101,13 +129,17 @@ export async function handleCollect(request, env) {
   const now = Date.now();
   await env.DB.prepare(
     `INSERT INTO fingerprints
-       (session_id, visitor_id, cross_id, confidence, ip, ip_country, ip_asn,
-        user_agent, incognito, bot_score, signals_json, created_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+       (session_id, visitor_id, cross_id, hw_id, os_id, confidence,
+        ip, ip_country, ip_asn, user_agent, incognito, bot_score,
+        gpu_canon, audio_fp, screen_res, cores, memory, timezone,
+        fonts_bitmap, fonts_hash, signals_json, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
   ).bind(
-    token, visitorId || null, crossId, confidence ?? null,
+    token, visitorId || null, crossId, hwId, osId, confidence ?? null,
     ip, cf.country || null, String(cf.asn || ''),
-    ua, incognito, botScore, JSON.stringify(signals), now
+    ua, incognito, botScore,
+    gpuCanon, audioFp, screenRes, cores, memory, timezone,
+    fontsBitmap, fontsHash, JSON.stringify(signals), now
   ).run();
 
   await env.DB.prepare(
@@ -118,7 +150,7 @@ export async function handleCollect(request, env) {
   if (session.tg_user_id) {
     try {
       await notifyVerified(env, session, {
-        visitorId, crossId, botScore, ip, ua,
+        visitorId, crossId, hwId, osId, botScore, ip, ua,
         incognito: !!incognito,
         turnstileOk: turnstileResult.present ? turnstileResult.success : null,
         cf, signals,
@@ -126,7 +158,7 @@ export async function handleCollect(request, env) {
     } catch (e) { /* 不阻塞返回 */ }
   }
 
-  return json({ ok: true, visitorId, crossId });
+  return json({ ok: true, visitorId, crossId, hwId, osId });
 }
 
 /**
