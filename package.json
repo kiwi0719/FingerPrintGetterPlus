@@ -7,7 +7,9 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:init": "wrangler d1 execute fingerprint-db --file=migrations/0001_init.sql",
-    "db:init:local": "wrangler d1 execute fingerprint-db --local --file=migrations/0001_init.sql"
+    "db:init:local": "wrangler d1 execute fingerprint-db --local --file=migrations/0001_init.sql",
+    "db:migrate": "wrangler d1 execute fingerprint-db --file=migrations/0001_init.sql && wrangler d1 execute fingerprint-db --file=migrations/0002_tg_user.sql && wrangler d1 execute fingerprint-db --file=migrations/0003_relay.sql",
+    "db:migrate:local": "wrangler d1 execute fingerprint-db --local --file=migrations/0001_init.sql && wrangler d1 execute fingerprint-db --local --file=migrations/0002_tg_user.sql && wrangler d1 execute fingerprint-db --local --file=migrations/0003_relay.sql"
   },
   "devDependencies": {
     "wrangler": "^3.90.0"

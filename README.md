@@ -133,10 +133,13 @@ cd FingerPrintGetterPlus
 | `--cf-account` | `-a` | — | Cloudflare Account ID(必需) |
 | `--tg-token` | `-b` | — | Telegram Bot Token(必需) |
 | `--admin-key` | `-k` | 随机 32 字节 hex | Web 管理后台 / 风控 API 密钥 |
+| `--turnstile-secret` | — | (不设) | Turnstile 服务端 secret;不设则跳过服务端二次校验,前端 widget 仍会显示 |
 | `--worker` | `-w` | `fingerprint-collector` | Worker 名字(决定 workers.dev 前缀) |
 | `--db` | `-d` | `fingerprint-db` | D1 数据库名 |
 
-环境变量也支持(同名):`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` / `TELEGRAM_BOT_TOKEN` / `ADMIN_KEY` / `WORKER_NAME` / `DB_NAME`。命令行参数优先。
+环境变量也支持(同名):`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` / `TELEGRAM_BOT_TOKEN` / `ADMIN_KEY` / `TURNSTILE_SECRET` / `WORKER_NAME` / `DB_NAME`。命令行参数优先。
+
+> 脚本用 `_migrations` 表跟踪已应用的迁移,`deploy.sh` **可以安全重复执行**(重跑时已应用的迁移会跳过);代码小改动直接 `npx wrangler deploy` 也行。
 
 `./deploy.sh --help` 查看内置帮助。
 
@@ -315,8 +318,10 @@ FingerPrintGetterPlus/
 ├── deploy.sh                  一键部署脚本
 ├── wrangler.toml.example      配置模板(deploy.sh 会复制成本地 wrangler.toml)
 ├── package.json
-├── migrations/
-│   └── 0001_init.sql          D1 建表(sessions + fingerprints)
+├── migrations/                D1 迁移(deploy.sh 用 _migrations 表跟踪已应用项)
+│   ├── 0001_init.sql          sessions + fingerprints
+│   ├── 0002_tg_user.sql       sessions 补 tg_user_id/username/first_name
+│   └── 0003_relay.sql         users + config + relay_map(双向中继)
 ├── src/                       Worker 后端
 │   ├── index.js               路由入口 + 静态资源 fallback
 │   ├── util.js                JSON / CORS / 随机 token / SHA256 / 鉴权

@@ -10,7 +10,9 @@ import { randToken } from './util.js';
 export async function handleTelegram(request, env, ctx) {
   const update = await request.json().catch(() => null);
   if (!update?.message) return new Response('ok');
-  ctx.waitUntil(dispatch(env, update.message).catch(() => {}));
+  ctx.waitUntil(dispatch(env, update.message).catch((e) => {
+    console.error('tg dispatch error:', e?.stack || e?.message || e);
+  }));
   return new Response('ok');
 }
 
