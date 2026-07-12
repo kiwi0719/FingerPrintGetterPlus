@@ -90,12 +90,15 @@ npm install --silent
 WRANGLER="npx --yes wrangler@latest"
 
 echo "==> [2/8] 检查/创建 D1: $DB_NAME"
+# 注:wrangler 会在 stdout 打非-JSON 提示("📎 检测到 env-var token"等),
+# 只截取从第一个 [ 或 { 开始的部分再喂给 JSON.parse。
 DB_ID=$($WRANGLER d1 list --json 2>/dev/null | \
+  sed -n '/^[[{]/,$p' | \
   node -e "let d=JSON.parse(require('fs').readFileSync(0));console.log((d.find(x=>x.name==='$DB_NAME')||{}).uuid||'')")
 
 if [ -z "$DB_ID" ]; then
   echo "    创建新 D1..."
-  CREATE_OUT=$($WRANGLER d1 create "$DB_NAME")
+  CREATE_OUT=$($WRANGLER d1 create "$DB_NAME" 2>&1)
   DB_ID=$(echo "$CREATE_OUT" | grep -Eo '[0-9a-f-]{36}' | head -1)
 fi
 echo "    D1 ID: $DB_ID"
@@ -118,6 +121,7 @@ for f in migrations/*.sql; do
   name=$(basename "$f")
   hits=$($WRANGLER d1 execute "$DB_NAME" --remote --json \
     --command "SELECT 1 FROM _migrations WHERE name='$name'" 2>/dev/null | \
+    sed -n '/^[[{]/,$p' | \
     node -e "let d=JSON.parse(require('fs').readFileSync(0));console.log((d[0]?.results||d[0]?.result||[]).length||0)")
   if [ "${hits:-0}" -gt 0 ]; then
     echo "    · $name  (已应用,跳过)"
@@ -145,6 +149,7 @@ $WRANGLER deploy
 # workers.dev 子域名
 SUBDOMAIN=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" \
+  | sed -n '/^[[{]/,$p' \
   | node -e "console.log(JSON.parse(require('fs').readFileSync(0)).result.subdomain)")
 BASE_URL="https://$WORKER_NAME.$SUBDOMAIN.workers.dev"
 echo "    BASE_URL: $BASE_URL"
