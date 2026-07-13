@@ -108,6 +108,10 @@ async function handleTarget(env, msg, from, text) {
   const uid = String(from.id);
   const chatId = String(msg.chat.id);
   const firstName = [from.first_name, from.last_name].filter(Boolean).join(' ') || null;
+  const username = from.username || null;
+
+  // 先取旧记录,用于检测改名
+  const prevUser = await env.DB.prepare('SELECT * FROM users WHERE tg_user_id = ?').bind(uid).first();
 
   // upsert users
   await env.DB.prepare(
@@ -117,9 +121,33 @@ async function handleTarget(env, msg, from, text) {
        tg_chat_id = excluded.tg_chat_id,
        tg_username = excluded.tg_username,
        tg_first_name = excluded.tg_first_name`
-  ).bind(uid, chatId, from.username || null, firstName, Date.now()).run();
+  ).bind(uid, chatId, username, firstName, Date.now()).run();
 
   const user = await env.DB.prepare('SELECT * FROM users WHERE tg_user_id = ?').bind(uid).first();
+
+  // 已验证用户改名 → 通知 owner
+  if (prevUser?.verified_at) {
+    const nameChanged = (prevUser.tg_first_name || null) !== firstName;
+    const unameChanged = (prevUser.tg_username || null) !== username;
+    if (nameChanged || unameChanged) {
+      const ownerChatId = await getConfig(env, 'owner_chat_id') || await getConfig(env, 'owner_id');
+      if (ownerChatId) {
+        const diffs = [];
+        if (nameChanged) {
+          diffs.push(`名字:<code>${escapeHtml(prevUser.tg_first_name || '(空)')}</code> → <code>${escapeHtml(firstName || '(空)')}</code>`);
+        }
+        if (unameChanged) {
+          const oldU = prevUser.tg_username ? '@' + escapeHtml(prevUser.tg_username) : '(无)';
+          const newU = username ? '@' + escapeHtml(username) : '(无)';
+          diffs.push(`用户名:<code>${oldU}</code> → <code>${newU}</code>`);
+        }
+        await sendMessage(env, ownerChatId,
+          `⚠️ <b>已验证用户改名</b>\n\n` +
+          `${userMention(user, uid)}\n\n` +
+          diffs.join('\n'));
+      }
+    }
+  }
 
   if (!user.verified_at) {
     // 复用最近未完成的 session,避免每条消息生成新链接
