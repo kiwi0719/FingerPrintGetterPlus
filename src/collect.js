@@ -146,6 +146,21 @@ export async function handleCollect(request, env) {
     "UPDATE sessions SET status='collected', hits = hits + 1 WHERE id = ?"
   ).bind(token).run();
 
+  // 多账号关联检测:同一 hw_id 已属于另一个已验证的 tg_user_id
+  let linkedUser = null;
+  if (session.tg_user_id && hwId) {
+    linkedUser = await env.DB.prepare(
+      `SELECT u.tg_user_id, u.tg_username, u.tg_first_name, u.verified_at
+         FROM fingerprints f
+         JOIN sessions s ON s.id = f.session_id
+         JOIN users u    ON u.tg_user_id = s.tg_user_id
+        WHERE f.hw_id = ?
+          AND s.tg_user_id != ?
+          AND u.verified_at IS NOT NULL
+        ORDER BY u.verified_at ASC LIMIT 1`
+    ).bind(hwId, session.tg_user_id).first();
+  }
+
   // 通知 owner:此用户已完成验证(下次消息起自动转发)
   if (session.tg_user_id) {
     try {
@@ -154,7 +169,7 @@ export async function handleCollect(request, env) {
         incognito: !!incognito,
         turnstileOk: turnstileResult.present ? turnstileResult.success : null,
         cf, signals,
-      });
+      }, linkedUser);
     } catch (e) { /* 不阻塞返回 */ }
   }
 

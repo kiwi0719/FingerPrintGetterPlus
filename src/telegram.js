@@ -192,7 +192,7 @@ async function recordRelay(env, ownerMsgId, targetChatId) {
 
 /* -------- 从 collect.js 调用:验证完成后通知 owner -------- */
 
-export async function notifyVerified(env, session, fp) {
+export async function notifyVerified(env, session, fp, linkedUser) {
   const ownerChatId = await getConfig(env, 'owner_chat_id') || await getConfig(env, 'owner_id');
   if (!ownerChatId) return;
 
@@ -201,6 +201,22 @@ export async function notifyVerified(env, session, fp) {
       `UPDATE users SET verified_at = ?, first_session_id = COALESCE(first_session_id, ?)
          WHERE tg_user_id = ?`
     ).bind(Date.now(), session.id, session.tg_user_id).run();
+  }
+
+  if (linkedUser) {
+    // 同一设备的第二个 TG 账号:告知 owner 有关联,并提示当前用户无需重复验证
+    const primary = userMention(linkedUser, linkedUser.tg_user_id);
+    const second = userMention(session, session.tg_user_id);
+    await sendMessage(env, ownerChatId,
+      `⚠️ <b>多账号关联</b>\n\n` +
+      `新验证:${second}\n` +
+      `与已验证账号同设备:${primary}\n` +
+      `(hw_id 一致,IP: <code>${escapeHtml(fp.ip || '')}</code>)`);
+    if (session.tg_chat_id) {
+      await sendMessage(env, session.tg_chat_id,
+        `✅ 验证完成!现在可以直接发消息了,我会转达给对方。`);
+    }
+    return;
   }
 
   const text = buildSummary(env, session, fp);
