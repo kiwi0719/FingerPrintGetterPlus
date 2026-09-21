@@ -1,11 +1,24 @@
 # FingerPrintGetterPlus
 
+[![CI](https://github.com/kiwi0719/FingerPrintGetterPlus/actions/workflows/ci.yml/badge.svg)](https://github.com/kiwi0719/FingerPrintGetterPlus/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 浏览器/设备指纹采集系统,反欺诈用途。全部跑在 Cloudflare 免费额度内。
+
+*[English](README.en.md)*
 
 - **后端**: Cloudflare Worker(边缘计算,无冷启动)
 - **存储**: Cloudflare D1(SQLite,每天 500 万次读 / 10 万次写免费)
 - **前端**: FingerprintJS 开源版 + 70+ 项自研扩展信号
 - **入口**: Telegram Bot(生成采集链接)+ Web 管理面板
+
+> ### ⚠️ 使用范围
+>
+> 本项目采集的是可识别到具体设备的个人数据。**只应在你自己运营的服务里,对已被告知的访问者使用**,用于风控与反欺诈。
+>
+> 不要用来追踪、监视未授权的对象,不要注入到第三方页面,不要在未向用户明示的情况下采集。请遵守当地隐私法规(GDPR / PIPL 等)。工具本身不判定用途的合法性,**责任由部署者承担**。
+>
+> 详见 [SECURITY.md](SECURITY.md)。
 
 ## 目录
 
@@ -24,7 +37,9 @@
 - [风控标签](#风控标签)
 - [维护](#维护)
 - [目录结构](#目录结构)
-- [合规提醒](#合规提醒)
+- [开发与测试](#开发与测试)
+- [贡献](#贡献)
+- [许可证](#许可证)
 
 ---
 
@@ -340,6 +355,8 @@ FingerPrintGetterPlus/
 ├── deploy.sh                  一键部署脚本
 ├── wrangler.toml.example      配置模板(deploy.sh 会复制成本地 wrangler.toml)
 ├── package.json
+├── test/                      单元测试(node --test)
+├── .github/workflows/ci.yml   CI:语法检查 + 测试 + deploy --dry-run
 ├── migrations/                D1 迁移(deploy.sh 用 _migrations 表跟踪已应用项)
 │   ├── 0001_init.sql          sessions + fingerprints
 │   ├── 0002_tg_user.sql       sessions 补 tg_user_id/username/first_name
@@ -353,11 +370,38 @@ FingerPrintGetterPlus/
 │   ├── risk.js                风控反查(精确 + 同 hw_id + 相似度) + 全量导出 + 汇总统计
 │   └── telegram.js            TG Bot(任何消息都返回采集链接)
 └── public/                    Cloudflare Workers Assets
-    ├── collect.html           采集页(伪装"安全验证中")
+    ├── collect.html           采集页(以"安全验证"形式呈现,含 Turnstile)
     ├── extra-signals.js       70+ 项扩展信号采集
     └── admin.html             Web 管理面板
 ```
 
-## 合规提醒
+## 开发与测试
 
-采集页应向被采集方明示用途(风控/反欺诈),并遵守当地隐私法规(GDPR / PIPL 等)。仅在**你自己的业务场景中,对访问你服务的用户**采集,不要向第三方页面注入,不要用于监视非授权对象。工具本身不判定用途合法性,责任由部署者承担。
+```bash
+npm install
+cp wrangler.toml.example wrangler.toml   # 填入你自己的 D1 database_id
+npm run db:migrate:local
+npm run dev                              # 本地 Worker + 本地 D1
+```
+
+```bash
+npm test                                 # Node 内置 runner,无额外依赖
+```
+
+测试覆盖 `src/fonts.js` 与 `src/risk.js` 里的纯函数(字体 bitmap、汉明距离、GPU 规范化、相似度打分、风控标签)。Worker 运行时相关的代码暂无测试。
+
+> **改 `CANONICAL_FONTS` 要小心**:它的顺序必须与 `public/extra-signals.js` 的探测顺序完全一致,只能往末尾追加。插入或重排会让**所有历史 bitmap 失效**。
+
+## 贡献
+
+欢迎 issue 和 PR,详见 [CONTRIBUTING.md](CONTRIBUTING.md)。参与前请阅读[行为准则](CODE_OF_CONDUCT.md)。
+
+安全漏洞请走 [SECURITY.md](SECURITY.md) 的私下报告流程,**不要开公开 issue**。
+
+版本变更记录见 [CHANGELOG.md](CHANGELOG.md)。
+
+## 许可证
+
+[MIT](LICENSE) © kiwi0719
+
+本项目使用 [FingerprintJS](https://github.com/fingerprintjs/fingerprintjs) 开源版(BSD-3-Clause)。
