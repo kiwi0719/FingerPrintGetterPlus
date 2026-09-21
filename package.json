@@ -1,15 +1,30 @@
 {
   "name": "fingerprint-collector",
   "version": "1.0.0",
+  "description": "Browser/device fingerprint collection for anti-fraud, on Cloudflare Workers + D1 + a Telegram bot.",
+  "license": "MIT",
+  "author": "kiwi0719",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kiwi0719/FingerPrintGetterPlus.git"
+  },
+  "homepage": "https://github.com/kiwi0719/FingerPrintGetterPlus#readme",
+  "bugs": {
+    "url": "https://github.com/kiwi0719/FingerPrintGetterPlus/issues"
+  },
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "node --test 'test/*.test.js'",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:init": "wrangler d1 execute fingerprint-db --file=migrations/0001_init.sql",
     "db:init:local": "wrangler d1 execute fingerprint-db --local --file=migrations/0001_init.sql",
-    "db:migrate": "wrangler d1 execute fingerprint-db --file=migrations/0001_init.sql && wrangler d1 execute fingerprint-db --file=migrations/0002_tg_user.sql && wrangler d1 execute fingerprint-db --file=migrations/0003_relay.sql",
-    "db:migrate:local": "wrangler d1 execute fingerprint-db --local --file=migrations/0001_init.sql && wrangler d1 execute fingerprint-db --local --file=migrations/0002_tg_user.sql && wrangler d1 execute fingerprint-db --local --file=migrations/0003_relay.sql"
+    "db:migrate": "wrangler d1 execute fingerprint-db --file=migrations/0001_init.sql && wrangler d1 execute fingerprint-db --file=migrations/0002_tg_user.sql && wrangler d1 execute fingerprint-db --file=migrations/0003_relay.sql && wrangler d1 execute fingerprint-db --file=migrations/0004_layered_ids.sql",
+    "db:migrate:local": "wrangler d1 execute fingerprint-db --local --file=migrations/0001_init.sql && wrangler d1 execute fingerprint-db --local --file=migrations/0002_tg_user.sql && wrangler d1 execute fingerprint-db --local --file=migrations/0003_relay.sql && wrangler d1 execute fingerprint-db --local --file=migrations/0004_layered_ids.sql"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "devDependencies": {
     "wrangler": "^3.90.0"
