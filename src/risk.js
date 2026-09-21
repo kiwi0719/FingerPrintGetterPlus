@@ -199,7 +199,7 @@ async function pullCandidates(env, seed) {
  *   时区一致                  +0.5
  *   字体精确一致              +2   否则按 bitmap 汉明距离折算(距离 ≤ 4 给分)
  */
-function similarityScore(a, b) {
+export function similarityScore(a, b) {
   const parts = {};
   let total = 0;
   parts.gpu    = a.gpu_canon && a.gpu_canon === b.gpu_canon ? 3 : 0;
@@ -223,7 +223,7 @@ function similarityScore(a, b) {
   return { total: +total.toFixed(2), parts };
 }
 
-function buildFlags(rows, sessions, ips) {
+export function buildFlags(rows, sessions, ips) {
   const flags = [];
   if (sessions.size > 3) flags.push('same_device_many_sessions'); // 同设备多次采集 → 可疑复用
   if (ips.size > 3) flags.push('device_ip_hopping');              // 同设备频繁换 IP
