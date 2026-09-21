@@ -1,0 +1,26 @@
+name: 功能建议 / Feature request
+description: 新信号、新接口或改进
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提之前请读 [SECURITY.md](../blob/main/SECURITY.md) 的「关于本项目的用途」。
+        以隐藏采集行为、绕过 Turnstile、对抗浏览器反指纹措施为目的的请求会被关闭。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解决什么问题
+      description: 不要直接描述方案，先说你遇到的实际问题
+    validations: { required: true }
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 你设想的做法
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: 确认
+      options:
+        - label: 这个功能用于我自己运营的服务、对知情的访问者做风控
+          required: true

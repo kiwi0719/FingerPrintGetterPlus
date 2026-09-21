@@ -1,0 +1,36 @@
+name: Bug 报告 / Bug report
+description: 部署或运行时出错
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        安全漏洞请走 [SECURITY.md](../blob/main/SECURITY.md) 的私下报告流程，不要开公开 issue。
+        **粘贴日志前请先删掉 bot token、ADMIN_KEY、D1 database_id 和任何真实 IP。**
+  - type: textarea
+    id: what
+    attributes:
+      label: 现象
+      description: 发生了什么，你期望发生什么
+    validations: { required: true }
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. npm run deploy
+        2. 访问 /c/<token>
+        3. ...
+    validations: { required: true }
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 报错
+      description: '`wrangler tail` 输出或浏览器控制台报错（已脱敏）'
+      render: shell
+  - type: input
+    id: env
+    attributes:
+      label: 环境
+      placeholder: 'wrangler 3.90.0 / Node 20 / macOS 15 / Chrome 131'
+    validations: { required: true }
