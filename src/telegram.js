@@ -165,8 +165,8 @@ async function handleTarget(env, msg, from, text) {
       ).bind(token, chatId, uid, from.username || null, firstName, Date.now()).run();
     }
     return sendMessage(env, msg.chat.id,
-      `👋 请先完成人机验证:\n\n${env.BASE_URL}/c/${token}\n\n` +
-      `完成后回来发消息即可继续对话。`);
+      `👋 首次联系前请先打开下面的链接完成设备核验:\n\n${env.BASE_URL}/c/${token}\n\n` +
+      `该页面会采集你的设备指纹用于风控(页面内有说明);完成后回来发消息即可继续对话。`);
   }
 
   // 已验证 → 转发到 owner
@@ -332,7 +332,7 @@ function buildSummary(env, session, fp) {
   // WebRTC 泄露(反 VPN)
   const rtcIps = (s.webrtc?.ips || []).filter((x) => x && x !== fp.ip);
 
-  const link = `${env.BASE_URL}/?key=${env.ADMIN_KEY}`;
+  const link = `${env.BASE_URL}/`; // 不带密钥:面板从 localStorage 取,首次手动输入
 
   return [
     `✅ <b>新用户验证完成</b>`,

@@ -2,6 +2,9 @@ import { json, sha256 } from './util.js';
 import { notifyVerified } from './telegram.js';
 import { fontsToBitmap, canonicalGpu } from './fonts.js';
 
+// 单个采集链接最多接受的上报次数,防止拿到 token 后灌库。
+const MAX_HITS_PER_SESSION = 20;
+
 /**
  * 接收前端上报的指纹信号,做服务端富化(IP/ASN/国家、bot 评分、cross_id),写入 D1。
  */
@@ -18,6 +21,7 @@ export async function handleCollect(request, env) {
 
   const session = await env.DB.prepare('SELECT * FROM sessions WHERE id = ?').bind(token).first();
   if (!session) return json({ error: 'invalid_session' }, 404);
+  if ((session.hits || 0) >= MAX_HITS_PER_SESSION) return json({ error: 'rate_limited' }, 429);
 
   // 服务端信号:Cloudflare 边缘富化
   const cf = request.cf || {};
@@ -182,7 +186,7 @@ export async function handleCollect(request, env) {
 function computeBotScore(s, ua, cf) {
   let score = 0;
   if (s.webdriver) score += 0.4;                              // navigator.webdriver
-  if (s.hardware?.cores === 0) score += 0.1;
+  if (s.hardware?.cores == null) score += 0.1;                // 没上报核数:headless 常见,真人浏览器几乎总有
   if (!s.gpu?.renderer || /swiftshader|llvmpipe/i.test(s.gpu?.renderer || '')) score += 0.2; // 软件渲染
   if (s.plugins?.length === 0 && /chrome/i.test(ua)) score += 0.1;
   if (/headless/i.test(ua)) score += 0.4;

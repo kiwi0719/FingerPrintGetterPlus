@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>安全验证</title>
+<title>设备核验 / Device check</title>
 <style>
   body { font-family: -apple-system, "Segoe UI", "PingFang SC", Roboto, sans-serif;
          display: flex; align-items: center; justify-content: center;
@@ -18,6 +18,10 @@
   .desc { color: #94a3b8; font-size: 13px; margin: 8px 0 20px; line-height: 1.6; }
   .ok { color: #4ade80; font-size: 44px; margin-bottom: 8px; }
   .ts-wrap { margin: 20px 0 0; display: flex; justify-content: center; min-height: 65px; }
+  .notice { margin: 18px 0 0; padding: 12px 14px; background: #0f172a;
+            border: 1px solid #334155; border-radius: 10px;
+            font-size: 12px; line-height: 1.6; color: #94a3b8; text-align: left; }
+  .notice b { color: #cbd5e1; font-weight: 600; }
   .footer { margin-top: 22px; font-size: 11px; color: #64748b; }
   .footer a { color: #64748b; text-decoration: none; }
 </style>
@@ -25,9 +29,18 @@
 <body>
   <div class="card" id="card">
     <div class="spinner" id="spinner"></div>
-    <h1 id="title">安全验证中</h1>
-    <div class="desc" id="desc">正在完成访问校验,请稍候…</div>
+    <h1 id="title">设备核验中</h1>
+    <div class="desc" id="desc">正在读取本设备的浏览器与硬件特征,请稍候…</div>
     <div class="ts-wrap"><div id="turnstile-widget"></div></div>
+    <div class="notice">
+      <b>本页面会采集你的设备指纹</b>用于风控与反欺诈:浏览器与操作系统特征、
+      屏幕/显卡/音频等硬件参数、时区语言、以及你的 IP 与网络信息。数据仅发送给本服务的运营方。
+      如果你不接受,请关闭本页面。
+      <br><br>
+      <b>This page collects a device fingerprint</b> for fraud prevention: browser and OS
+      traits, screen/GPU/audio hardware parameters, timezone and language, and your IP and
+      network. The data goes only to this service's operator. Close this page if you do not consent.
+    </div>
     <div class="footer">Protected by <a href="https://www.cloudflare.com/products/turnstile/" target="_blank">Cloudflare Turnstile</a></div>
   </div>
 

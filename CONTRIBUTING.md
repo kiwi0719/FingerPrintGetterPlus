@@ -11,6 +11,10 @@ Please read the "On intended use" section of [SECURITY.md](SECURITY.md) first. F
 
 安全漏洞走 [SECURITY.md](SECURITY.md) 的私下报告流程，不要开公开 issue。
 
+改动标识符生成、模糊匹配打分或采集告知行为前，请先读 [docs/design.md](docs/design.md)——那里记录了这些决策的理由。想推翻其中某条，请带上具体数据开 issue。
+
+Before touching identifier generation, the fuzzy-match scoring, or the collection disclosure, read [docs/design.md](docs/design.md), where those decisions are recorded. To overturn one, open an issue with concrete data.
+
 ## 本地开发
 
 ```bash
@@ -38,6 +42,8 @@ npm test
 - 一个 PR 做一件事
 - 加了迁移就新建 `migrations/000N_xxx.sql`，**不要改已发布的迁移文件**——`deploy.sh` 用 `_migrations` 表跟踪已应用项，改旧文件不会重跑
 - PR 前跑一遍 `npm test` 和 `npx wrangler deploy --dry-run`
+- 面向用户的改动在 `CHANGELOG.md` 的 `[Unreleased]` 下记一条
+- 文档改动请同时更新 `README.md`(英文)与 `README.zh-CN.md`(中文),两份是对等的
 
 ## 代码风格
 

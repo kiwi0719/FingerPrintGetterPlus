@@ -3,7 +3,23 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".github/ISSUE_TEMPLATE/**"
+  # every pull request runs, docs-only ones included: the main ruleset
+  # requires `ci-ok`, and a check that never reports blocks the merge
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Pull requests: the newest push wins. Every other run keeps its own group.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || format('{0}-{1}-{2}', github.ref, github.event_name, github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
@@ -39,3 +55,18 @@ jobs:
           sed 's/REPLACE_WITH_YOUR_D1_ID/00000000-0000-0000-0000-000000000000/' \
             wrangler.toml.example > wrangler.toml
           npx wrangler deploy --dry-run --outdir /tmp/wrangler-build
+
+  # The one check the main ruleset requires. It fails unless every job above
+  # succeeded, so adding or renaming a job only needs an edit to `needs` here.
+  ci-ok:
+    if: always()
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: every job succeeded
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$NEEDS" | jq -e 'all(.[]; .result == "success")' > /dev/null
