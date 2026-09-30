@@ -1,0 +1,11 @@
+# Weekly update PRs, grouped per ecosystem so CI runs once per batch.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups: { actions: { patterns: ["*"] } }
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    groups: { npm: { patterns: ["*"] } }

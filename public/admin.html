@@ -135,16 +135,17 @@
 <script>
 const $ = (id) => document.getElementById(id);
 
-const urlKey = new URLSearchParams(location.search).get('key');
+// 密钥放在 URL 片段(#key=...)里:片段不会发给服务器,不进访问日志、也不进 Referer
+const urlKey = new URLSearchParams(location.hash.slice(1)).get('key');
 $('key').value = urlKey || localStorage.getItem('admin_key') || '';
-if (urlKey) { localStorage.setItem('admin_key', urlKey); history.replaceState({}, '', location.pathname); }
+if (urlKey) { localStorage.setItem('admin_key', urlKey); history.replaceState({}, '', location.pathname + location.search); }
 
 let RECORDS = [];
 
 async function api(path) {
   const key = $('key').value.trim();
   localStorage.setItem('admin_key', key);
-  const r = await fetch(path + (path.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(key));
+  const r = await fetch(path, { headers: { 'x-admin-key': key } });
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
@@ -528,9 +529,15 @@ async function risk(crossId) {
   alert(`设备 ${crossId.slice(0,16)}…\n命中: ${r.total_hits}\n关联 session: ${r.distinct_sessions}\n关联 IP: ${r.distinct_ips.join(', ')}\n风险标签: ${r.risk_flags.join(', ') || '无'}`);
 }
 
-function exportCSV() {
-  const key = $('key').value.trim();
-  window.open('/api/all?format=csv&limit=1000&key=' + encodeURIComponent(key));
+async function exportCSV() {
+  // 密钥走请求头,不进 URL;用 blob 触发下载
+  const r = await fetch('/api/all?format=csv&limit=1000', { headers: { 'x-admin-key': $('key').value.trim() } });
+  if (!r.ok) return alert('导出失败: HTTP ' + r.status);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(await r.blob());
+  a.download = 'fingerprints.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function esc(s) { return String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }

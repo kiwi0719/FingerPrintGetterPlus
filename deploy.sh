@@ -168,7 +168,7 @@ WEBHOOK_RESP=$(curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWeb
 echo "    $WEBHOOK_RESP"
 
 BOT_USERNAME=$(curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe" | node -e "console.log(JSON.parse(require('fs').readFileSync(0)).result.username)")
-ADMIN_URL="$BASE_URL/?key=$ADMIN_KEY"
+ADMIN_URL="$BASE_URL/#key=$ADMIN_KEY"   # 用 # 片段:不会发给服务器/进日志
 
 cat <<EOF
 

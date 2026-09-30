@@ -1,9 +1,9 @@
 import { json, checkAdmin, unauthorized } from './util.js';
 import { hammingHex } from './fonts.js';
 
-/** 全量导出 / 分页浏览。GET /api/all?key=..&limit=100&offset=0&format=json|csv */
+/** 全量导出 / 分页浏览。GET /api/all?limit=100&offset=0&format=json|csv */
 export async function handleAll(request, env, url) {
-  if (!checkAdmin(request, env, url)) return unauthorized();
+  if (!(await checkAdmin(request, env))) return unauthorized();
   const limit = Math.min(1000, +url.searchParams.get('limit') || 100);
   const offset = +url.searchParams.get('offset') || 0;
   const format = url.searchParams.get('format') || 'json';
@@ -34,9 +34,9 @@ export async function handleAll(request, env, url) {
   });
 }
 
-/** 会话列表(不含具体信号,轻量)。GET /api/sessions?key=..&limit=50 */
+/** 会话列表(不含具体信号,轻量)。GET /api/sessions?limit=50 */
 export async function handleSessions(request, env, url) {
-  if (!checkAdmin(request, env, url)) return unauthorized();
+  if (!(await checkAdmin(request, env))) return unauthorized();
   const limit = Math.min(500, +url.searchParams.get('limit') || 50);
   const status = url.searchParams.get('status'); // pending|collected
 
@@ -47,9 +47,9 @@ export async function handleSessions(request, env, url) {
   return json({ count: results.length, sessions: results });
 }
 
-/** 汇总统计。GET /api/stats?key=.. */
+/** 汇总统计。GET /api/stats */
 export async function handleStats(request, env, url) {
-  if (!checkAdmin(request, env, url)) return unauthorized();
+  if (!(await checkAdmin(request, env))) return unauthorized();
   const stats = {};
   stats.sessions_total    = (await env.DB.prepare('SELECT COUNT(*) n FROM sessions').first()).n;
   stats.sessions_pending  = (await env.DB.prepare("SELECT COUNT(*) n FROM sessions WHERE status='pending'").first()).n;
@@ -78,8 +78,7 @@ export async function handleStats(request, env, url) {
 
 /** 查询单次采集会话的全部上报记录 */
 export async function handleSession(request, env, id) {
-  const url = new URL(request.url);
-  if (!checkAdmin(request, env, url)) return unauthorized();
+  if (!(await checkAdmin(request, env))) return unauthorized();
 
   const session = await env.DB.prepare('SELECT * FROM sessions WHERE id = ?').bind(id).first();
   if (!session) return json({ error: 'not_found' }, 404);
@@ -92,14 +91,14 @@ export async function handleSession(request, env, id) {
 }
 
 /**
- * 风控反查:GET /api/risk?key=..&visitorId=..|cross=..|hw=..|os=..|ip=..
+ * 风控反查:GET /api/risk?visitorId=..|cross=..|hw=..|os=..|ip=..
  * 三层返回:
  *   exact       — 与所查标识精确一致的历史命中
  *   same_hw     — 同一物理设备(跨浏览器 + 跨网络),按 hw_id 精确匹配
  *   similar     — 硬件字段 + 字体 bitmap 汉明距离 相似度打分(容忍单字段漂移)
  */
 export async function handleRisk(request, env, url) {
-  if (!checkAdmin(request, env, url)) return unauthorized();
+  if (!(await checkAdmin(request, env))) return unauthorized();
 
   const p = url.searchParams;
   const q = {
@@ -135,9 +134,11 @@ export async function handleRisk(request, env, url) {
     }
 
     // 相似候选:任一强字段命中即拉进来,再打分
+    // 排除已经出现在 exact / same_hw 里的记录,避免同一条在多个桶里重复
+    const seenIds = new Set([...exact, ...sameHw].map((r) => r.id));
     const candidates = await pullCandidates(env, seed);
     similar = candidates
-      .filter((r) => r.id !== seed.id && r.hw_id !== seed.hw_id) // 已经在 same_hw 里的不再重复
+      .filter((r) => !seenIds.has(r.id) && r.hw_id !== seed.hw_id)
       .map((r) => ({ row: r, score: similarityScore(seed, r) }))
       .filter((x) => x.score.total >= 4)  // 阈值:总分至少 4/10
       .sort((a, b) => b.score.total - a.score.total)
