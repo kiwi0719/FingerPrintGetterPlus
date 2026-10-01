@@ -164,7 +164,10 @@ fs.writeFileSync('wrangler.toml',t);
 $WRANGLER deploy
 
 echo "==> [8/8] 设置 Telegram webhook"
-WEBHOOK_RESP=$(curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook?url=${BASE_URL}/tg/webhook")
+# secret_token 与 src/telegram.js 的 webhookSecret() 一致:sha256("tg-webhook:" + bot token)
+WEBHOOK_SECRET=$(printf '%s' "tg-webhook:${TELEGRAM_BOT_TOKEN}" | shasum -a 256 | cut -d' ' -f1)
+WEBHOOK_RESP=$(curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
+  --data-urlencode "url=${BASE_URL}/tg/webhook" --data-urlencode "secret_token=${WEBHOOK_SECRET}")
 echo "    $WEBHOOK_RESP"
 
 BOT_USERNAME=$(curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe" | node -e "console.log(JSON.parse(require('fs').readFileSync(0)).result.username)")

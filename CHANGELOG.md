@@ -6,6 +6,19 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+### Security
+- Fixed four CodeQL findings. `esc()` (admin panel) and `escapeHtml()` (Telegram)
+  now also escape `"` and `'`; they were used inside `href="..."` / `title="..."`
+  attributes, so a crafted codec string or Telegram username could inject
+  attributes (stored XSS in the admin panel, where `ADMIN_KEY` lives in
+  `localStorage`). The UA-CH brand regex no longer uses an unbounded `.*`
+  (polynomial ReDoS on client-supplied input) and the brand is length-capped.
+- **`/tg/webhook` now requires Telegram's `secret_token`.** Without it anyone
+  could forge an update and plant arbitrary usernames. The secret is derived
+  from the bot token, so there is nothing new to store.
+  **Upgrade note:** re-run `./deploy.sh` (or `setWebhook` with `secret_token`)
+  after upgrading; until you do, the bot answers 403 and stops relaying.
+
 ### Added
 - Complete bilingual documentation: English `README.md` (primary) and
   `README.zh-CN.md`, each a full peer of the other with a language switcher.

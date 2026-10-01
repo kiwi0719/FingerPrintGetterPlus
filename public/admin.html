@@ -540,7 +540,8 @@ async function exportCSV() {
   URL.revokeObjectURL(a.href);
 }
 
-function esc(s) { return String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+// 也转义引号:esc() 的结果会被放进 href="..." / title="..." 属性里
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
