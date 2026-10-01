@@ -333,7 +333,11 @@ echo "new key: $NEW_KEY"
 **Rotate the bot token** (after BotFather `/revoke`)
 ```bash
 echo -n "<new token>" | npx wrangler secret put TELEGRAM_BOT_TOKEN
-curl "https://api.telegram.org/bot<new token>/setWebhook?url=<BASE_URL>/tg/webhook"
+# Easiest: just re-run ./deploy.sh -- it recomputes the webhook secret and calls setWebhook.
+# By hand, the secret_token is sha256("tg-webhook:" + <new token>):
+SECRET=$(printf '%s' "tg-webhook:<new token>" | shasum -a 256 | cut -d' ' -f1)
+curl "https://api.telegram.org/bot<new token>/setWebhook" \
+  --data-urlencode "url=<BASE_URL>/tg/webhook" --data-urlencode "secret_token=$SECRET"
 ```
 
 **Wipe the database** (use with care)

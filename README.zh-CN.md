@@ -333,7 +333,11 @@ echo "新 key: $NEW_KEY"
 **滚动 Bot Token**(BotFather `/revoke` 后)
 ```bash
 echo -n "<新token>" | npx wrangler secret put TELEGRAM_BOT_TOKEN
-curl "https://api.telegram.org/bot<新token>/setWebhook?url=<BASE_URL>/tg/webhook"
+# 最省事:重新跑一遍 ./deploy.sh,它会重算 webhook secret 并调用 setWebhook。
+# 手动的话,secret_token = sha256("tg-webhook:" + <新token>):
+SECRET=$(printf '%s' "tg-webhook:<新token>" | shasum -a 256 | cut -d' ' -f1)
+curl "https://api.telegram.org/bot<新token>/setWebhook" \
+  --data-urlencode "url=<BASE_URL>/tg/webhook" --data-urlencode "secret_token=$SECRET"
 ```
 
 **清库**(慎用)

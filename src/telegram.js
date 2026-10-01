@@ -1,4 +1,4 @@
-import { randToken } from './util.js';
+import { randToken, sha256, timingSafeEqual } from './util.js';
 
 /**
  * 双向中继 Bot:
@@ -7,7 +7,17 @@ import { randToken } from './util.js';
  *   owner → bot: 回复某条转发消息 → bot 帮忙投递给对应用户
  *   任何人 /claim <ADMIN_KEY> → 成为 owner(首次或转移)
  */
+// setWebhook 的 secret_token 由 bot token 派生(见 deploy.sh),不需要额外保管一个密钥。
+export async function webhookSecret(env) {
+  return sha256(`tg-webhook:${env.TELEGRAM_BOT_TOKEN || ''}`);
+}
+
 export async function handleTelegram(request, env, ctx) {
+  // 只接受带正确 secret 的请求,否则任何人都能伪造 update(伪造用户名/消息)
+  const got = request.headers.get('x-telegram-bot-api-secret-token');
+  if (!env.TELEGRAM_BOT_TOKEN || !got || !(await timingSafeEqual(got, await webhookSecret(env)))) {
+    return new Response('forbidden', { status: 403 });
+  }
   const update = await request.json().catch(() => null);
   if (!update?.message) return new Response('ok');
   ctx.waitUntil(dispatch(env, update.message).catch((e) => {
@@ -281,7 +291,8 @@ function buildSummary(env, session, fp) {
   // 浏览器
   let browser = 'Unknown';
   const brands = uacd.fullVersionList || uacd.brands || [];
-  const nice = brands.find((b) => !/Not.*Brand|Chromium/i.test(b.brand || ''));
+  // brand 来自客户端上报:截断长度,且不用无界的 .* (多项式回溯 / ReDoS)
+  const nice = brands.find((b) => !/Not[^B]{0,20}Brand|Chromium/i.test(String(b.brand || '').slice(0, 64)));
   if (nice) browser = `${nice.brand} ${nice.version || ''}`;
   else if (/Firefox\/([\d.]+)/i.test(ua)) browser = `Firefox ${RegExp.$1}`;
   else if (/Version\/([\d.]+).*Safari/i.test(ua)) browser = `Safari ${RegExp.$1}`;
@@ -435,6 +446,7 @@ async function setConfig(env, key, value) {
   ).bind(key, value).run();
 }
 
-function escapeHtml(s) {
-  return String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+// 也转义引号:结果会被放进 <a href="..."> 属性里
+export function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
